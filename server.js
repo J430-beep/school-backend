@@ -1,26 +1,26 @@
+import fs from "fs";
+import admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
-import admin from "firebase-admin";
-import fs from "fs";
 
-// ✅ Load Firebase service account (FIXED)
-const serviceAccount = JSON.parse(
-  fs.readFileSync(new URL("./serviceAccountKey.json", import.meta.url))
-);
+// Step 1: Write the JSON file from Render environment variable
+fs.writeFileSync("serviceAccountKey.json", process.env.GCP_JSON);
 
-// ✅ Initialize Firebase
+// Step 2: Load Firebase service account
+import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+
+// Step 3: Initialize Firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Email setup (Render environment variables)
+// ✅ Email setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -28,7 +28,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_PASS
   }
 });
-
 
 // ================= SAVE MARKS =================
 app.post("/saveMarks", async (req, res) => {
@@ -68,7 +67,6 @@ app.post("/saveMarks", async (req, res) => {
       });
     }
 
-    // ✅ Send email immediately if provided
     if (parentEmail) {
       await transporter.sendMail({
         from: process.env.GMAIL_USER,
@@ -86,7 +84,6 @@ app.post("/saveMarks", async (req, res) => {
   }
 });
 
-
 // ================= SEND RESULTS TO PARENTS =================
 app.post("/send-results", async (req, res) => {
   try {
@@ -96,7 +93,6 @@ app.post("/send-results", async (req, res) => {
       return res.json({ success: false, message: "Missing class or exam" });
     }
 
-    // Get students in class
     const studentsSnap = await db.collection("students")
       .where("class", "==", className)
       .get();
@@ -109,10 +105,8 @@ app.post("/send-results", async (req, res) => {
 
     for (const studentDoc of studentsSnap.docs) {
       const student = studentDoc.data();
-
       if (!student.parentEmail) continue;
 
-      // Get results
       const resultsSnap = await db.collection("results")
         .where("name", "==", student.name)
         .where("exam", "==", exam)
@@ -121,13 +115,11 @@ app.post("/send-results", async (req, res) => {
       if (resultsSnap.empty) continue;
 
       let message = `Results for ${student.name} (${exam}):\n\n`;
-
       resultsSnap.forEach(doc => {
         const r = doc.data();
         message += `${r.subject}: ${r.marks}/${r.total} (${r.percentage.toFixed(2)}%)\n`;
       });
 
-      // Send email
       await transporter.sendMail({
         from: process.env.GMAIL_USER,
         to: student.parentEmail,
@@ -145,7 +137,6 @@ app.post("/send-results", async (req, res) => {
     res.json({ success: false, message: err.message });
   }
 });
-
 
 // ================= START SERVER =================
 const PORT = process.env.PORT || 5000;
