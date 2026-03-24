@@ -27,8 +27,8 @@ const db = getFirestore(fbApp);
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.iranduxavier6@gmail.com, 
-    pass: process.ygkqinaupdrneciw
+    user: "iranduxavier6@gmail.com",   // <-- use quotes
+    pass: "ygkqinaupdrneciw"           // <-- Gmail App Password
   }
 });
 
