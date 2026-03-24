@@ -27,8 +27,8 @@ const db = getFirestore(fbApp);
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.iranduxavier6@gmail.com, 
+    pass: process.ygkqinaupdrneciw
   }
 });
 
@@ -54,7 +54,7 @@ app.post("/send-results", async (req, res) => {
       resultsSnap.forEach(r => { const data=r.data(); message+=`${data.subject}: ${data.marks}/${data.total} (${Math.round(data.percentage)}%)\n`; });
 
       try {
-        await transporter.sendMail({ from: process.env.EMAIL_USER, to: student.parentEmail, subject:`Results for ${student.name} (${exam})`, text:message });
+        await transporter.sendMail({ from: process.iranduxavier6@gmail.com, to: student.parentEmail, subject:`Results for ${student.name} (${exam})`, text:message });
         sentCount++;
       } catch(e) { failed.push({student:student.name, reason:"Email send failed"}); }
     }
