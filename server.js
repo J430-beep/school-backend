@@ -1,73 +1,75 @@
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, where } from "firebase/firestore";
+import admin from "firebase-admin";
+import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+
+// Initialize Firebase
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+const db = admin.firestore();
 
 const app = express();
-app.use(cors({ origin: "*" }));
+app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyDqFbsXJr8G0r_9ppNLYGbsCBGZJdQ4BqA",
-  authDomain: "kipini-school-portal.firebaseapp.com",
-  projectId: "kipini-school-portal",
-  storageBucket: "kipini-school-portal.appspot.com",
-  messagingSenderId: "633954688245",
-  appId: "1:633954688245:web:72ca52641fb9716ab679bc"
-};
-
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
-
-// Email transporter
+// Email using environment variables
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER,   // EMAIL_USER from Render
-    pass: process.env.EMAIL_PASS    // EMAIL_PASS from Render
+    user: process.env.GMAIL_USER, // set this in Render dashboard
+    pass: process.env.GMAIL_PASS  // set this in Render dashboard
   }
 });
 
-// Send results
-app.post("/send-results", async (req, res) => {
-  const { class: className, exam } = req.body;
-  if (!className || !exam) return res.status(400).json({ success:false, sentCount:0, message:"Class or exam missing" });
-
+app.post("/saveMarks", async (req, res) => {
   try {
-    const studentsSnap = await getDocs(query(collection(db, "students"), where("class", "==", className)));
-    if (studentsSnap.empty) return res.json({ success:false, sentCount:0, message:"No students found" });
+    const { studentName, exam, subject, marks, total, teacherId, className, parentEmail } = req.body;
+    const percentage = (marks / total) * 100;
 
-    let sentCount = 0, failed = [];
+    const querySnap = await db.collection("results")
+      .where("name", "==", studentName)
+      .where("exam", "==", exam)
+      .where("subject", "==", subject)
+      .where("class", "==", className)
+      .get();
 
-    for (const studentDoc of studentsSnap.docs) {
-      const student = studentDoc.data();
-      if (!student.parentEmail) { failed.push({student:student.name, reason:"No parent email"}); continue; }
-
-      const resultsSnap = await getDocs(query(collection(db,"results"), where("name","==",student.name), where("exam","==",exam)));
-      if (resultsSnap.empty) { failed.push({student:student.name, reason:"No results found"}); continue; }
-
-      let message = `Results for ${student.name} (${exam}):\n\n`;
-      resultsSnap.forEach(r => { const data=r.data(); message+=`${data.subject}: ${data.marks}/${data.total} (${Math.round(data.percentage)}%)\n`; });
-
-      try {
-        await transporter.sendMail({ 
-  from: process.env.EMAIL_USER,  // use the environment variable
-  to: student.parentEmail, 
-  subject: `Results for ${student.name} (${exam})`, 
-  text: message 
-});
-        sentCount++;
-      } catch(e) { failed.push({student:student.name, reason:"Email send failed"}); }
+    if (!querySnap.empty) {
+      querySnap.forEach(async (doc) => {
+        await doc.ref.update({
+          marks, total, percentage, teacherId, class: className, timestamp: new Date()
+        });
+      });
+    } else {
+      await db.collection("results").add({
+        name: studentName,
+        exam,
+        subject,
+        marks,
+        total,
+        percentage,
+        teacherId,
+        class: className,
+        timestamp: new Date()
+      });
     }
 
-    res.json({ success:true, sentCount, failed });
-  } catch(err) {
-    res.status(500).json({ success:false, sentCount:0, message: err.message || "Unknown error" });
+    if (parentEmail) {
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: parentEmail,
+        subject: `Results for ${studentName} (${exam})`,
+        text: `Hello, ${studentName} scored ${marks}/${total} (${percentage.toFixed(2)}%) in ${subject} for ${exam}.`
+      });
+    }
+
+    res.json({ success: true, percentage: percentage.toFixed(2) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(PORT, ()=>console.log(`Server running on port ${PORT}`));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
