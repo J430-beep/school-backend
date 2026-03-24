@@ -1,35 +1,48 @@
-import admin from "firebase-admin";
+// server.js
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
+import admin from "firebase-admin";
 
-// ================= FIREBASE SETUP =================
-// Load Firebase credentials directly from Render environment variable
+// ----------------- FIREBASE ADMIN -----------------
+// Parse service account JSON directly from Render environment variable
+if (!process.env.GCP_JSON) {
+  throw new Error("GCP_JSON environment variable not set in Render!");
+}
+
 const serviceAccount = JSON.parse(process.env.GCP_JSON);
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
+
+// ----------------- EXPRESS SETUP -----------------
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= EMAIL SETUP =================
+// ----------------- EMAIL SETUP -----------------
+if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+  throw new Error("GMAIL_USER or GMAIL_PASS environment variables not set!");
+}
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  }
+    pass: process.env.GMAIL_PASS,
+  },
 });
 
 // ================= SAVE MARKS =================
 app.post("/saveMarks", async (req, res) => {
   try {
     const { studentName, exam, subject, marks, total, teacherId, className, parentEmail } = req.body;
-    if (!studentName || !exam || !subject) return res.json({ success: false, message: "Missing required fields" });
+    if (!studentName || !exam || !subject) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
 
     const percentage = (marks / total) * 100;
 
@@ -41,9 +54,9 @@ app.post("/saveMarks", async (req, res) => {
       .get();
 
     if (!querySnap.empty) {
-      querySnap.forEach(async (doc) => {
+      for (const doc of querySnap.docs) {
         await doc.ref.update({ marks, total, percentage, teacherId, class: className, timestamp: new Date() });
-      });
+      }
     } else {
       await db.collection("results").add({ name: studentName, exam, subject, marks, total, percentage, teacherId, class: className, timestamp: new Date() });
     }
@@ -59,18 +72,16 @@ app.post("/saveMarks", async (req, res) => {
 
     res.json({ success: true, percentage: percentage.toFixed(2) });
   } catch (err) {
-    console.error("Error saving marks:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
 // ================= SEND RESULTS TO PARENTS =================
 app.post("/send-results", async (req, res) => {
   try {
-    console.log("Request body:", req.body); // 🔹 Debugging
-
     const { class: className, exam } = req.body;
-    if (!className || !exam) return res.json({ success: false, message: "Missing class or exam" });
+    if (!className || !exam) return res.status(400).json({ success: false, message: "Missing class or exam" });
 
     const studentsSnap = await db.collection("students").where("class", "==", className).get();
     if (studentsSnap.empty) return res.json({ success: false, message: "No students found" });
@@ -105,9 +116,10 @@ app.post("/send-results", async (req, res) => {
     }
 
     res.json({ success: true, sentCount });
+
   } catch (err) {
-    console.error("Error sending results:", err);
-    res.json({ success: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
