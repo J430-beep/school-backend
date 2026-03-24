@@ -5,21 +5,12 @@ import nodemailer from "nodemailer";
 import admin from "firebase-admin";
 
 // ----------------- FIREBASE ADMIN -----------------
-// Parse service account JSON directly from Render environment variable
 if (!process.env.GCP_JSON) {
   throw new Error("GCP_JSON environment variable not set in Render!");
 }
 
-// ----------------- FIREBASE ADMIN -----------------
-// Parse service account JSON directly from Render environment variable
-if (!process.env.GCP_JSON) {
-  throw new Error("GCP_JSON environment variable not set in Render!");
-}
-
-// Fix line breaks in the private key automatically
-const serviceAccount = JSON.parse(
-  process.env.GCP_JSON.replace(/\\n/g, "\n")
-);
+// Parse JSON and fix escaped newlines
+const serviceAccount = JSON.parse(process.env.GCP_JSON.replace(/\\n/g, "\n"));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
