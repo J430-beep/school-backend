@@ -3,14 +3,10 @@ import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
+import fs from "fs";
 
 // ----------------- FIREBASE ADMIN -----------------
-if (!process.env.GCP_JSON) {
-  throw new Error("GCP_JSON environment variable not set in Render!");
-}
-
-// Parse JSON and fix escaped newlines
-const serviceAccount = JSON.parse(process.env.GCP_JSON.replace(/\\n/g, "\n"));
+const serviceAccount = JSON.parse(fs.readFileSync("serviceAccountKey.json", "utf8"));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
