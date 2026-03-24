@@ -2,7 +2,11 @@ import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+import fs from "fs";
+
+const serviceAccount = JSON.parse(
+  fs.readFileSync(new URL("./serviceAccountKey.json", import.meta.url))
+);
 
 // Initialize Firebase
 admin.initializeApp({
