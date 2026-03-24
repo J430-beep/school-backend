@@ -8,7 +8,8 @@ import nodemailer from "nodemailer";
 fs.writeFileSync("serviceAccountKey.json", process.env.GCP_JSON);
 
 // Step 2: Load Firebase service account
-import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
+// Read JSON from file
+const serviceAccount = JSON.parse(fs.readFileSync("serviceAccountKey.json", "utf-8"));
 
 // Step 3: Initialize Firebase
 admin.initializeApp({
