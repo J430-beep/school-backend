@@ -1,12 +1,14 @@
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
+import { getDocs, collection, query, where } from "firebase/firestore";
+import { db } from "./firebase.js"; // your Firebase initialization
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔐 EMAIL CONFIG (PUT YOUR EMAIL HERE)
+// 🔐 Email config
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -15,32 +17,68 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// 📩 SEND RESULTS
+// 📩 Send results to all parents
 app.post("/send-results", async (req, res) => {
-  const { parentEmail, studentName, exam, results } = req.body;
+  const { class: className, exam } = req.body;
+
+  if (!className || !exam) {
+    return res.json({ success: false, sentCount: 0, message: "Class or exam missing" });
+  }
 
   try {
-    let message = `Results for ${studentName} (${exam}):\n\n`;
+    const studentsSnap = await getDocs(
+      query(collection(db, "students"), where("class", "==", className))
+    );
 
-    results.forEach(r => {
-      message += `${r.subject}: ${r.marks}/${r.total} (${Math.round(r.percentage)}%)\n`;
-    });
+    if (studentsSnap.empty) {
+      return res.json({ success: false, sentCount: 0, message: "No students found" });
+    }
 
-    await transporter.sendMail({
-      from: "iranduxavier6@gmail.com",
-      to: parentEmail,
-      subject: "Student Results",
-      text: message
-    });
+    let sentCount = 0;
 
-    res.json({ success: true });
+    for (const studentDoc of studentsSnap.docs) {
+      const student = studentDoc.data();
+      if (!student.parentEmail) continue;
 
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      const resultsSnap = await getDocs(
+        query(collection(db, "results"),
+          where("name", "==", student.name),
+          where("exam", "==", exam))
+      );
+
+      if (resultsSnap.empty) continue;
+
+      // Build email content
+      let message = `Results for ${student.name} (${exam}):\n\n`;
+      resultsSnap.forEach(r => {
+        const data = r.data();
+        message += `${data.subject}: ${data.marks}/${data.total} (${Math.round(data.percentage)}%)\n`;
+      });
+
+      // Send email
+      await transporter.sendMail({
+        from: "iranduxavier6@gmail.com",
+        to: student.parentEmail,
+        subject: "Student Results",
+        text: message
+      });
+
+      sentCount++;
+    }
+
+    if (sentCount === 0) {
+      res.json({ success: false, sentCount: 0, message: "No parents with results to send" });
+    } else {
+      res.json({ success: true, sentCount });
+    }
+
+  } catch (err) {
+    console.error(err);
+    res.json({ success: false, sentCount: 0, message: err.message });
   }
 });
 
-// 🌍 START SERVER
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+// 🌍 Start server
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Server running...");
 });
