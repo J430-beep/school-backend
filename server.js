@@ -42,7 +42,7 @@ app.post("/saveMarks", async (req, res) => {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    const percentage = (marks / total) * 100;
+    const percentage = Number(((marks / total) * 100).toFixed(2));
 
     const querySnap = await db.collection("results")
       .where("name", "==", studentName)
@@ -100,7 +100,8 @@ app.post("/send-results", async (req, res) => {
       let message = `Results for ${student.name} (${exam}):\n\n`;
       resultsSnap.forEach(doc => {
         const r = doc.data();
-        message += `${r.subject}: ${r.marks}/${r.total} (${r.percentage.toFixed(2)}%)\n`;
+        const percentage = Number(r.percentage || 0);
+message += `${r.subject}: ${r.marks}/${r.total} (${percentage.toFixed(2)}%)\n`;
       });
 
       await transporter.sendMail({
