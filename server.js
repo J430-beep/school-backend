@@ -3,17 +3,19 @@ import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import admin from "firebase-admin";
-import fs from "fs";
 
-// ----------------- FIREBASE ADMIN -----------------
-const serviceAccount = JSON.parse(fs.readFileSync("serviceAccountKey.json", "utf8"));
+// ----------------- FIREBASE ADMIN (ENV METHOD) -----------------
+if (!process.env.GCP_JSON) {
+  throw new Error("GCP_JSON environment variable not set!");
+}
+
+const serviceAccount = JSON.parse(process.env.GCP_JSON);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
-
 // ----------------- EXPRESS SETUP -----------------
 const app = express();
 app.use(cors());
