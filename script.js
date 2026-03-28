@@ -327,69 +327,6 @@ allStudents.forEach((student, index) => {
       </td>
     </tr>`;
 
-    html += `</table>`;
-    resultsDiv.innerHTML = html;
-
-    // Add update functionality
-    document.querySelectorAll('.updateBtn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const studentName = btn.dataset.student;
-        try {
-          const row = btn.closest('tr');
-          let total = 0, count = 0;
-
-          for (let sub of subjects) {
-            const input = row.querySelector(`input[data-subject="${sub}"][data-student="${studentName}"]`);
-            if (!input) continue;
-
-            let val = parseInt(input.value);
-            if (isNaN(val) || val < 0) val = 0;
-            if (val > 100) val = 100;
-
-            total += val;
-            count++;
-
-            // Update Firestore
-            const r = resultsSnap.docs.find(d => {
-              const data = d.data();
-              return data.name === studentName && data.exam === exam && data.subject === sub;
-            });
-
-            if (r) {
-              await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
-            } else {
-              // If no record, create new
-              await addDoc(collection(db, 'results'), {
-                name: studentName,
-                exam,
-                subject: sub,
-                marks: val, 
-                total: 100,
-                percentage: val,
-                teacherId: currentTeacherUid,
-                timestamp: new Date()
-              });
-            }
-          }
-
-          // Update row totals
-          const mean = count > 0 ? Math.round(total / count) : 0;
-          row.querySelectorAll('td')[subjects.length + 2].innerText = total;
-          row.querySelectorAll('td')[subjects.length + 3].innerText = mean;
-          alert(`Updated ${studentName}'s marks successfully!`);
-
-        } catch (err) {
-          console.error(err);
-          alert('Error updating marks: ' + err.message);
-        }
-      });
-    });
-
-  } catch (err) {
-    console.error(err);
-    resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
-  }
-};
 
 // ----------------- TEACHER LOGIN -----------------
 window.loginTeacher = async () => {
@@ -403,7 +340,177 @@ window.loginTeacher = async () => {
     const userCredential = await signInWithEmailAndPassword(auth,email,password);
     currentTeacherUid = userCredential.user.uid;
     hideElements([document.getElementById('teacherLogin')]);
-    showElement(document.getElementById('teacherDashboard'));
+    showElement(document.getElementById('teacherDashboawindow.loadClassResults = async () => {
+  const className = document.getElementById('classSelect').value;
+  const exam = document.getElementById('examSelect').value;
+  const resultsDiv = document.getElementById('classResults');
+
+  if (!className || !exam) {
+    resultsDiv.innerHTML = "<p style='color:red'>Select class and exam</p>";
+    return;
+  }
+
+  resultsDiv.innerHTML = "Loading results...";
+
+  try {
+    const studentsSnap = await getDocs(
+      query(collection(db, 'students'), where('class', '==', className))
+    );
+
+    if (studentsSnap.empty) {
+      resultsDiv.innerHTML = "<p style='color:red'>No students found</p>";
+      return;
+    }
+
+    const studentNames = studentsSnap.docs.map(doc => doc.data().name);
+    const resultsSnap = await getDocs(collection(db, 'results'));
+
+    let allStudents = [];
+    let subjectTotals = {};
+    let subjectCounts = {};
+
+    subjects.forEach(sub => {
+      subjectTotals[sub] = 0;
+      subjectCounts[sub] = 0;
+    });
+
+    // Build allStudents array
+    for (const studentDoc of studentsSnap.docs) {
+      const student = studentDoc.data();
+      const studentData = { name: student.name, subjects: {}, total: 0, count: 0 };
+
+      resultsSnap.forEach(rDoc => {
+        const r = rDoc.data();
+        if (r.name === student.name && r.exam === exam) {
+          studentData.subjects[r.subject] = { percentage: Math.round(r.percentage), docRef: rDoc.ref };
+          studentData.total += Math.round(r.percentage);
+          studentData.count++;
+          subjectTotals[r.subject] += Math.round(r.percentage);
+          subjectCounts[r.subject]++;
+        }
+      });
+
+      studentData.mean = studentData.count > 0 ? Math.round(studentData.total / studentData.count) : 0;
+      allStudents.push(studentData);
+    }
+
+    // Helper to rebuild table and assign positions
+    function rebuildClassTable() {
+      // Sort by total descending
+      allStudents.sort((a, b) => b.total - a.total);
+
+      // Assign positions (handle ties)
+      let lastTotal = null;
+      let position = 0;
+      allStudents.forEach((student, index) => {
+        if (student.total !== lastTotal) position = index + 1;
+        student.position = position;
+        lastTotal = student.total;
+      });
+
+      // Build HTML table
+      let html = `<table border="1" cellpadding="5" cellspacing="0">
+        <tr><th>Pos</th><th>Name</th>`;
+      subjects.forEach(sub => html += `<th>${sub}</th>`);
+      html += `<th>Total</th><th>Mean</th><th>Action</th></tr>`;
+
+      let classTotalMean = 0;
+
+      allStudents.forEach(s => {
+        html += `<tr>
+          <td>${s.position}</td>
+          <td>${s.name}</td>`;
+        subjects.forEach(sub => {
+          const val = s.subjects[sub]?.percentage || 0;
+          html += `<td><input type="number" min="0" max="100" value="${val}" 
+                     style="width:50px" data-student="${s.name}" data-subject="${sub}"></td>`;
+        });
+        html += `<td>${s.total}</td><td>${s.mean}</td>
+                 <td><button class="updateBtn" data-student="${s.name}">Update</button></td></tr>`;
+        classTotalMean += s.mean;
+      });
+
+      // Subject mean row
+      html += `<tr><td colspan="2"><strong>Subject Mean</strong></td>`;
+      subjects.forEach(sub => {
+        const mean = subjectCounts[sub] > 0 ? Math.round(subjectTotals[sub] / subjectCounts[sub]) : 0;
+        html += `<td>${mean}</td>`;
+      });
+      html += `<td>-</td><td>-</td><td>-</td></tr>`;
+
+      const classMean = Math.round(classTotalMean / allStudents.length);
+      html += `<tr><td colspan="${subjects.length + 3}" style="text-align:center">
+                 <strong>Class Mean: ${classMean}</strong></td></tr>`;
+
+      html += `</table>`;
+      resultsDiv.innerHTML = html;
+
+      // Attach update buttons
+      document.querySelectorAll('.updateBtn').forEach(btn => {
+        btn.addEventListener('click', async () => { await updateStudentMarks(btn.dataset.student); });
+      });
+    }
+
+    // Update student marks function
+    async function updateStudentMarks(studentName) {
+      try {
+        const student = allStudents.find(s => s.name === studentName);
+        if (!student) return;
+
+        let total = 0, count = 0;
+
+        for (let sub of subjects) {
+          const input = document.querySelector(`input[data-student="${studentName}"][data-subject="${sub}"]`);
+          if (!input) continue;
+
+          let val = parseInt(input.value);
+          if (isNaN(val) || val < 0) val = 0;
+          if (val > 100) val = 100;
+
+          student.subjects[sub].percentage = val;
+          total += val;
+          count++;
+
+          const r = resultsSnap.docs.find(d => {
+            const data = d.data();
+            return data.name === studentName && data.exam === exam && data.subject === sub;
+          });
+
+          if (r) {
+            await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
+          } else {
+            await addDoc(collection(db, 'results'), {
+              name: studentName,
+              exam,
+              subject: sub,
+              marks: val,
+              total: 100,
+              percentage: val,
+              teacherId: currentTeacherUid,
+              timestamp: new Date()
+            });
+          }
+        }
+
+        student.total = total;
+        student.mean = count > 0 ? Math.round(total / count) : 0;
+
+        rebuildClassTable();
+        alert(`Updated ${studentName}'s marks successfully!`);
+      } catch (err) {
+        console.error(err);
+        alert('Error updating marks: ' + err.message);
+      }
+    }
+
+    // Initial table build
+    rebuildClassTable();
+
+  } catch (err) {
+    console.error(err);
+    resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
+  }
+};rd'));
 
     // Populate student dropdown
     const studentSelect = document.getElementById('marksStudentSelect');
