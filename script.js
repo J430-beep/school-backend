@@ -260,8 +260,18 @@ window.loadClassResults = async () => {
       allStudents.push(studentData);
     }
 
-    // Sort students by mean descending
-    allStudents.sort((a, b) => b.mean - a.mean);
+    // Sort students by total descending (highest first)
+allStudents.sort((a, b) => b.total - a.total);
+
+// Assign positions, handling ties
+let lastTotal = null;
+let position = 0;
+
+allStudents.forEach((student, index) => {
+  if (student.total !== lastTotal) position = index + 1;
+  student.position = position;
+  lastTotal = student.total;
+});
 
     // Build table
     let html = `<table border="1" cellpadding="5" cellspacing="0">
@@ -276,7 +286,7 @@ window.loadClassResults = async () => {
 
     allStudents.forEach((s, index) => {
       html += `<tr>
-        <td>${index + 1}</td>
+        <td>${s.position}</td>
         <td>${s.name}</td>`;
 
       subjects.forEach(sub => {
