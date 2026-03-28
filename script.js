@@ -1,34 +1,18 @@
-// ----------------- IMPORT FIREBASE -----------------
-import { 
-  getStorage, 
-  ref, 
-  uploadBytesResumable, 
-  getDownloadURL,
-  deleteObject 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+// ----------------- FIREBASE -----------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 import { 
-  getFirestore, 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
-  addDoc,
-  deleteDoc,
-  doc
+  getFirestore, collection, getDocs, query, where, addDoc 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail 
+  getAuth, signInWithEmailAndPassword 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-
-// ----------------- FIREBASE CONFIG -----------------
+// CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDqFbsXJr8G0r_9ppNLYGbsCBGZJdQ4BqA",
   authDomain: "kipini-school-portal.firebaseapp.com",
   projectId: "kipini-school-portal",
-    storageBucket: "kipini-school-portal.firebasestorage.app",
+  storageBucket: "kipini-school-portal.firebasestorage.app",
   messagingSenderId: "633954688245",
   appId: "1:633954688245:web:72ca52641fb9716ab679bc"
 };
@@ -36,1051 +20,269 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
 
-// ----------------- GLOBAL VARIABLES -----------------
+// ----------------- GLOBALS -----------------
 let currentStudentName = "";
-let currentStudentClass = "";
-let currentTeacherUid = "";
-const subjects = ["Math", "Eng", "Kiswa", "CRE", "S/S", "INT/Sci", "PRE-TECH", "C.A/P.E", "Agri"];
+let currentTeacher = "";
 
-// ----------------- HELPER FUNCTIONS -----------------
-function hideElements(elements){ 
-  elements.forEach(el => { 
-    if(el){ el.classList.remove('fade-in'); el.classList.add('hidden'); el.style.display='none'; } 
-  }); 
+const subjects = ["Math","Eng","Kiswa","CRE","S/S","Sci","Agri"];
+
+// ----------------- NAV -----------------
+function hideAll(){
+  document.querySelectorAll("section").forEach(s=>s.style.display="none");
 }
-function showElement(el){ 
-  if(!el) return; 
-  el.classList.remove('hidden'); 
-  el.classList.add('fade-in'); 
-  el.style.display='block'; 
+function show(id){
+  hideAll();
+  document.getElementById(id).style.display="block";
 }
+window.showPage = id => show(id);
 
-window.showPage = id => {
-  ['home','portal','gallerySection','videoSection'].forEach(s => hideElements([document.getElementById(s)]));
-  showElement(document.getElementById(id));
-};
-
-window.showLogin = role => {
-  showPage('portal');
-  hideElements([
-    document.getElementById('studentLogin'),
-    document.getElementById('teacherLogin'),
-    document.getElementById('studentDashboard'),
-    document.getElementById('teacherDashboard')
-  ]);
-  if(role==='student') showElement(document.getElementById('studentLogin'));
-  if(role==='teacher') showElement(document.getElementById('teacherLogin'));
-};
-
-window.setActiveButton = (btn) => {
-  document.querySelectorAll('.nav-right button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+window.showLogin = role=>{
+  show("portal");
+  document.getElementById("studentLogin").style.display="none";
+  document.getElementById("teacherLogin").style.display="none";
+  document.getElementById(role+"Login").style.display="block";
 };
 
 // ----------------- STUDENT LOGIN -----------------
-window.loginStudent = async () => {
-  const inputName = document.getElementById('loginName').value.trim().toLowerCase();
-  const inputYear = document.getElementById('loginYear').value.trim();
-  const msg = document.getElementById('msg');
-  msg.style.color='red';
-  if(!inputName||!inputYear){ msg.innerText="Fill all fields"; return; }
+window.loginStudent = async ()=>{
+  const name = loginName.value.trim().toLowerCase();
+  const year = loginYear.value.trim();
+  const msg = document.getElementById("msg");
 
-  try{
-    const snap = await getDocs(collection(db,'students'));
-    let found=null;
-    snap.forEach(doc=>{
-      const data = doc.data();
-      if(data.name && data.year &&
-         data.name.trim().toLowerCase() === inputName &&
-         data.year.toString().trim() === inputYear) found = data;
-    });
+  if(!name || !year){ msg.innerText="Fill all fields"; return; }
 
-    if(found){ 
-      msg.style.color='green'; 
-      msg.innerText="Login successful"; 
-      currentStudentName = found.name;
-      currentStudentClass = found.class;
-      document.getElementById('studentWelcome').innerText = `Welcome, ${found.name} (${found.class})`;
-      hideElements([document.getElementById('studentLogin')]);
-      showElement(document.getElementById('studentDashboard'));
-    } else msg.innerText="Student not found";
-  } catch(e){
-    console.error(e);
-    msg.innerText="Error: "+e.message; 
+  const snap = await getDocs(collection(db,"students"));
+  let found=null;
+
+  snap.forEach(doc=>{
+    const d=doc.data();
+    if(d.name.toLowerCase()===name && d.year==year) found=d;
+  });
+
+  if(found){
+    currentStudentName = found.name;
+    msg.style.color="green";
+    msg.innerText="Login success";
+
+    studentLogin.style.display="none";
+    studentDashboard.style.display="block";
+    studentWelcome.innerText="Welcome "+found.name;
+  }else{
+    msg.innerText="Student not found";
   }
 };
 
-// ----------------- LOAD STUDENT RESULTS -----------------
-window.loadStudentResults = async () => {
-  const name = currentStudentName;
-  const exam = document.getElementById('studentExamSelect').value.trim();
-  const resultsDiv = document.getElementById('studentResultsDashboard');
+// ----------------- STUDENT RESULTS -----------------
+window.loadStudentResults = async ()=>{
+  const exam = studentExamSelect.value;
+  const div = studentResultsDashboard;
 
-  if (!name) {
-    resultsDiv.innerHTML = '<p style="color:red">Student not logged in.</p>';
-    return;
-  }
+  if(!exam){ div.innerHTML="Select exam"; return; }
 
-  if (!exam) {
-    resultsDiv.innerHTML = '<p style="color:red">Select an exam.</p>';
-    return;
-  }
+  const q = query(
+    collection(db,"results"),
+    where("name","==",currentStudentName),
+    where("exam","==",exam)
+  );
 
-  resultsDiv.innerHTML = 'Loading results...';
+  const snap = await getDocs(q);
 
-  try {
-    const q = query(
-      collection(db, "results"),
-      where("name", "==", name),
-      where("exam", "==", exam)
-    );
+  if(snap.empty){ div.innerHTML="No results"; return; }
 
-    const snap = await getDocs(q);
+  let total=0, count=0;
+  let html="<table><tr><th>Subject</th><th>%</th></tr>";
 
-    if (snap.empty) {
-      resultsDiv.innerHTML = '<p style="color:red">No results found.</p>';
-      return;
-    }
+  snap.forEach(doc=>{
+    const r=doc.data();
+    html+=`<tr><td>${r.subject}</td><td>${r.percentage}</td></tr>`;
+    total+=parseFloat(r.percentage); count++;
+  });
 
-    let html = `
-      <table>
-        <tr>
-          <th>Subject</th>
-          <th>Marks</th>
-          <th>Total</th>
-          <th>%</th>
-        </tr>
-    `;
-
-    let totalPercent = 0;
-    let count = 0;
-
-    snap.forEach(doc => {
-      const r = doc.data();
-      html += `
-        <tr>
-          <td>${r.subject}</td>
-          <td>${r.marks}</td>
-          <td>${r.total}</td>
-          <td>${r.percentage}</td>
-        </tr>
-      `;
-      totalPercent += parseFloat(r.percentage);
-      count++;
-    });
-
-    const mean = totalPercent / count;
-
-    html += `
-      <tr>
-        <td colspan="3"><strong>Mean %</strong></td>
-        <td>${mean.toFixed(2)}</td>
-      </tr>
-      </table>
-    `;
-
-    resultsDiv.innerHTML = html;
-
-  } catch (error) {
-    console.error(error);
-    resultsDiv.innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
-  }
+  html+=`<tr><td><b>Mean</b></td><td>${(total/count).toFixed(1)}</td></tr></table>`;
+  div.innerHTML=html;
 };
-
-// ----------------- LOAD & EDIT CLASS RESULTS -----------------
-window.loadClassResults = async () => {
-  const className = document.getElementById('classSelect').value;
-  const exam = document.getElementById('examSelect').value;
-  const resultsDiv = document.getElementById('classResults');
-
-  if (!className || !exam) {
-    resultsDiv.innerHTML = "<p style='color:red'>Select class and exam</p>";
-    return;
-  }
-
-  resultsDiv.innerHTML = "Loading results...";
-
-  try {
-    const studentsSnap = await getDocs(
-      query(collection(db, 'students'), where('class', '==', className))
-    );
-
-    if (studentsSnap.empty) {
-      resultsDiv.innerHTML = "<p style='color:red'>No students found</p>";
-      return;
-    }
-
-    // Fetch all results for this exam & class in one go
-    const studentNames = studentsSnap.docs.map(doc => doc.data().name);
-    const resultsSnap = await getDocs(
-      query(collection(db, 'results'))
-    );
-
-    let allStudents = [];
-    let subjectTotals = {};
-    let subjectCounts = {};
-
-    // Initialize subject totals
-    subjects.forEach(sub => {
-      subjectTotals[sub] = 0;
-      subjectCounts[sub] = 0;
-    });
-
-    for (const studentDoc of studentsSnap.docs) {
-      const student = studentDoc.data();
-      const studentData = {
-        name: student.name,
-        subjects: {},
-        total: 0,
-        count: 0
-      };
-
-      // Filter results for this student & exam
-      resultsSnap.forEach(rDoc => {
-        const r = rDoc.data();
-        if (r.name === student.name && r.exam === exam) {
-          studentData.subjects[r.subject] = { 
-            percentage: Math.round(r.percentage), 
-            docRef: rDoc.ref,
-            marks: r.marks,
-            total: r.total
-          };
-
-          studentData.total += Math.round(r.percentage);
-          studentData.count++;
-
-          subjectTotals[r.subject] += Math.round(r.percentage);
-          subjectCounts[r.subject]++;
-        }
-      });
-
-      studentData.mean = studentData.count > 0 ? Math.round(studentData.total / studentData.count) : 0;
-      allStudents.push(studentData);
-    }
-
-    // Sort students by total descending (highest first)
-allStudents.sort((a, b) => b.total - a.total);
-
-// Assign positions, handling ties
-let lastTotal = null;
-let position = 0;
-
-allStudents.forEach((student, index) => {
-  if (student.total !== lastTotal) position = index + 1;
-  student.position = position;
-  lastTotal = student.total;
-});
-
-    // Build table
-    let html = `<table border="1" cellpadding="5" cellspacing="0">
-      <tr>
-        <th>Pos</th>
-        <th>Name</th>`;
-
-    subjects.forEach(sub => html += `<th>${sub}</th>`);
-    html += `<th>Total</th><th>Mean</th><th>Action</th></tr>`;
-
-    let classTotalMean = 0;
-
-    allStudents.forEach((s, index) => {
-      html += `<tr>
-        <td>${s.position}</td>
-        <td>${s.name}</td>`;
-
-      subjects.forEach(sub => {
-        const val = s.subjects[sub]?.percentage || 0;
-        html += `<td>
-          <input type="number" 
-                 min="0" 
-                 max="100" 
-                 value="${val}" 
-                 style="width:50px" 
-                 data-student="${s.name}" 
-                 data-subject="${sub}">
-        </td>`;
-      });
-
-      html += `<td>${s.total}</td>
-               <td>${s.mean}</td>
-               <td><button class="updateBtn" data-student="${s.name}">Update</button></td>
-      </tr>`;
-
-      classTotalMean += s.mean;
-    });
-
-    // Subject mean row
-    html += `<tr>
-      <td colspan="2"><strong>Subject Mean</strong></td>`;
-    subjects.forEach(sub => {
-      const mean = subjectCounts[sub] > 0 ? Math.round(subjectTotals[sub] / subjectCounts[sub]) : 0;
-      html += `<td>${mean}</td>`;
-    });
-    html += `<td>-</td><td>-</td><td>-</td></tr>`;
-
-    // Class mean row
-    const classMean = Math.round(classTotalMean / allStudents.length);
-    html += `<tr>
-      <td colspan="${subjects.length + 3}" style="text-align:center">
-        <strong>Class Mean: ${classMean}</strong>
-      </td>
-    </tr>`;
-
 
 // ----------------- TEACHER LOGIN -----------------
-window.loginTeacher = async () => {
-  const email = document.getElementById('teacherName').value.trim();
-  const password = document.getElementById('teacherPassword').value.trim();
-  const msg = document.getElementById('msgTeacher');
+window.loginTeacher = async ()=>{
+  const email = teacherName.value;
+  const pass = teacherPassword.value;
+  const msg = msgTeacher;
 
-  if(!email||!password){ msg.style.color='red'; msg.innerText="Fill all fields"; return; }
+  if(!email||!pass){ msg.innerText="Fill all fields"; return; }
 
   try{
-    const userCredential = await signInWithEmailAndPassword(auth,email,password);
-    currentTeacherUid = userCredential.user.uid;
-    hideElements([document.getElementById('teacherLogin')]);
-    showElement(document.getElementById('teacherDashboawindow.loadClassResults = async () => {
-  const className = document.getElementById('classSelect').value;
-  const exam = document.getElementById('examSelect').value;
-  const resultsDiv = document.getElementById('classResults');
+    await signInWithEmailAndPassword(auth,email,pass);
+    currentTeacher=email;
 
-  if (!className || !exam) {
-    resultsDiv.innerHTML = "<p style='color:red'>Select class and exam</p>";
-    return;
-  }
+    msg.style.color="green";
+    msg.innerText="Login success";
 
-  resultsDiv.innerHTML = "Loading results...";
-
-  try {
-    const studentsSnap = await getDocs(
-      query(collection(db, 'students'), where('class', '==', className))
-    );
-
-    if (studentsSnap.empty) {
-      resultsDiv.innerHTML = "<p style='color:red'>No students found</p>";
-      return;
-    }
-
-    const studentNames = studentsSnap.docs.map(doc => doc.data().name);
-    const resultsSnap = await getDocs(collection(db, 'results'));
-
-    let allStudents = [];
-    let subjectTotals = {};
-    let subjectCounts = {};
-
-    subjects.forEach(sub => {
-      subjectTotals[sub] = 0;
-      subjectCounts[sub] = 0;
-    });
-
-    // Build allStudents array
-    for (const studentDoc of studentsSnap.docs) {
-      const student = studentDoc.data();
-      const studentData = { name: student.name, subjects: {}, total: 0, count: 0 };
-
-      resultsSnap.forEach(rDoc => {
-        const r = rDoc.data();
-        if (r.name === student.name && r.exam === exam) {
-          studentData.subjects[r.subject] = { percentage: Math.round(r.percentage), docRef: rDoc.ref };
-          studentData.total += Math.round(r.percentage);
-          studentData.count++;
-          subjectTotals[r.subject] += Math.round(r.percentage);
-          subjectCounts[r.subject]++;
-        }
-      });
-
-      studentData.mean = studentData.count > 0 ? Math.round(studentData.total / studentData.count) : 0;
-      allStudents.push(studentData);
-    }
-
-    // Helper to rebuild table and assign positions
-    function rebuildClassTable() {
-      // Sort by total descending
-      allStudents.sort((a, b) => b.total - a.total);
-
-      // Assign positions (handle ties)
-      let lastTotal = null;
-      let position = 0;
-      allStudents.forEach((student, index) => {
-        if (student.total !== lastTotal) position = index + 1;
-        student.position = position;
-        lastTotal = student.total;
-      });
-
-      // Build HTML table
-      let html = `<table border="1" cellpadding="5" cellspacing="0">
-        <tr><th>Pos</th><th>Name</th>`;
-      subjects.forEach(sub => html += `<th>${sub}</th>`);
-      html += `<th>Total</th><th>Mean</th><th>Action</th></tr>`;
-
-      let classTotalMean = 0;
-
-      allStudents.forEach(s => {
-        html += `<tr>
-          <td>${s.position}</td>
-          <td>${s.name}</td>`;
-        subjects.forEach(sub => {
-          const val = s.subjects[sub]?.percentage || 0;
-          html += `<td><input type="number" min="0" max="100" value="${val}" 
-                     style="width:50px" data-student="${s.name}" data-subject="${sub}"></td>`;
-        });
-        html += `<td>${s.total}</td><td>${s.mean}</td>
-                 <td><button class="updateBtn" data-student="${s.name}">Update</button></td></tr>`;
-        classTotalMean += s.mean;
-      });
-
-      // Subject mean row
-      html += `<tr><td colspan="2"><strong>Subject Mean</strong></td>`;
-      subjects.forEach(sub => {
-        const mean = subjectCounts[sub] > 0 ? Math.round(subjectTotals[sub] / subjectCounts[sub]) : 0;
-        html += `<td>${mean}</td>`;
-      });
-      html += `<td>-</td><td>-</td><td>-</td></tr>`;
-
-      const classMean = Math.round(classTotalMean / allStudents.length);
-      html += `<tr><td colspan="${subjects.length + 3}" style="text-align:center">
-                 <strong>Class Mean: ${classMean}</strong></td></tr>`;
-
-      html += `</table>`;
-      resultsDiv.innerHTML = html;
-
-      // Attach update buttons
-      document.querySelectorAll('.updateBtn').forEach(btn => {
-        btn.addEventListener('click', async () => { await updateStudentMarks(btn.dataset.student); });
-      });
-    }
-
-    // Update student marks function
-    async function updateStudentMarks(studentName) {
-      try {
-        const student = allStudents.find(s => s.name === studentName);
-        if (!student) return;
-
-        let total = 0, count = 0;
-
-        for (let sub of subjects) {
-          const input = document.querySelector(`input[data-student="${studentName}"][data-subject="${sub}"]`);
-          if (!input) continue;
-
-          let val = parseInt(input.value);
-          if (isNaN(val) || val < 0) val = 0;
-          if (val > 100) val = 100;
-
-          student.subjects[sub].percentage = val;
-          total += val;
-          count++;
-
-          const r = resultsSnap.docs.find(d => {
-            const data = d.data();
-            return data.name === studentName && data.exam === exam && data.subject === sub;
-          });
-
-          if (r) {
-            await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
-          } else {
-            await addDoc(collection(db, 'results'), {
-              name: studentName,
-              exam,
-              subject: sub,
-              marks: val,
-              total: 100,
-              percentage: val,
-              teacherId: currentTeacherUid,
-              timestamp: new Date()
-            });
-          }
-        }
-
-        student.total = total;
-        student.mean = count > 0 ? Math.round(total / count) : 0;
-
-        rebuildClassTable();
-        alert(`Updated ${studentName}'s marks successfully!`);
-      } catch (err) {
-        console.error(err);
-        alert('Error updating marks: ' + err.message);
-      }
-    }
-
-    // Initial table build
-    rebuildClassTable();
-
-  } catch (err) {
-    console.error(err);
-    resultsDiv.innerHTML = `<p style="color:red">${err.message}</p>`;
-  }
-};rd'));
-
-    // Populate student dropdown
-    const studentSelect = document.getElementById('marksStudentSelect');
-    studentSelect.innerHTML = '<option value="">Select Student</option>';
-    const snap = await getDocs(collection(db, 'students'));
-    snap.forEach(doc => {
-      const student = doc.data();
-      const opt = document.createElement('option');
-      opt.value = student.name;
-      opt.innerText = `${student.name} (${student.class})`;
-      studentSelect.appendChild(opt);
-    });
-
-    // Attach event listeners AFTER populating dropdowns
-    studentSelect.addEventListener('change', generateSubjectInputs);
-    document.getElementById('marksExamSelect').addEventListener('change', generateSubjectInputs);
-
-    // Teacher welcome name
-    const tSnap = await getDocs(collection(db,'teachers'));
-    tSnap.forEach(doc => {
-      const t = doc.data();
-      if(t.uid===currentTeacherUid) document.getElementById('teacherWelcome').innerText="Welcome "+t.name;
-    });
-
-    msg.style.color='green'; msg.innerText="Login successful!";
-  } catch(e){
-    console.error(e);
-    msg.style.color='red'; msg.innerText=e.message;
-  }
+    teacherLogin.style.display="none";
+    teacherDashboard.style.display="block";
+  }catch(e){ msg.innerText=e.message; }
 };
 
 // ----------------- ADD STUDENT -----------------
-window.addStudent = async () => {
-  const name = document.getElementById('newStudentName').value.trim();
-  const cls = document.getElementById('newStudentClass').value.trim();
-  const year = document.getElementById('newStudentYear').value.trim();
-  const msg = document.getElementById('addStudentMsg');
-  msg.style.color='red';
-  if(!name || !cls || !year){ msg.innerText="Fill all fields"; return; }
+window.addStudent = async ()=>{
+  const name=newStudentName.value;
+  const cls=newStudentClass.value;
+  const year=newStudentYear.value;
+  const msg=addStudentMsg;
 
-  try{
-    await addDoc(collection(db,'students'),{ name, class:cls, year, timestamp: new Date() });
-    msg.style.color='green';
-    msg.innerText="Student added successfully!";
-    document.getElementById('newStudentName').value='';
-    document.getElementById('newStudentClass').value='';
-    document.getElementById('newStudentYear').value='';
-  }catch(e){ msg.innerText="Error: "+e.message; }
+  if(!name||!cls||!year){ msg.innerText="Fill all"; return; }
+
+  await addDoc(collection(db,"students"),{name,class:cls,year});
+  msg.style.color="green";
+  msg.innerText="Added";
 };
 
-// ----------------- GENERATE SUBJECT INPUTS -----------------
-function generateSubjectInputs(){
-  const student = document.getElementById('marksStudentSelect').value;
-  const exam = document.getElementById('marksExamSelect').value;
-  const container = document.getElementById('subjectsInputs');
-  container.innerHTML=''; 
-  if(!student || !exam) return;
+// ----------------- ENTER MARKS -----------------
+window.saveMarks = async ()=>{
+  const student = marksStudentSelect.value;
+  const exam = marksExamSelect.value;
 
-  subjects.forEach(sub=>{
-    const div = document.createElement('div');
-    div.style.marginBottom='5px';
-    div.innerHTML = `
-      <label style="width:100px; display:inline-block;">${sub}:</label>
-      PP1: <input type="number" id="${sub}_pp1" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp1_total" placeholder="Total" min="1" style="width:50px; margin-right:10px;">
-      PP2: <input type="number" id="${sub}_pp2" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp2_total" placeholder="Total" min="1" style="width:50px; margin-right:10px;">
-      PP3: <input type="number" id="${sub}_pp3" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp3_total" placeholder="Total" min="1" style="width:50px;">
-    `;
-    container.appendChild(div);
-  });
-}
+  if(!student||!exam){ alert("Select student & exam"); return; }
 
-// ----------------- SAVE / UPDATE MARKS (PP1+PP2+PP3) -----------------
-window.saveMarks = async () => {
-  const studentName = document.getElementById('marksStudentSelect').value;
-  const exam = document.getElementById('marksExamSelect').value;
-  const className = document.getElementById('marksClassSelect').value;
-  const msg = document.getElementById('marksMsg');
+  for(let sub of subjects){
+    const val = document.getElementById(sub).value || 0;
 
-  msg.style.color = 'red';
-
-  if (!studentName || !exam || !className) {
-    msg.innerText = "Select student, class, and exam";
-    return;
+    await addDoc(collection(db,"results"),{
+      name:student,
+      exam,
+      subject:sub,
+      percentage:parseFloat(val)
+    });
   }
 
-  try {
-    for (let sub of subjects) {
-      // Read PP1, PP2, PP3 marks and totals
-      const pp1 = parseFloat(document.getElementById(`${sub}_pp1`)?.value) || 0;
-      const pp1Total = parseFloat(document.getElementById(`${sub}_pp1_total`)?.value) || 0;
-      const pp2 = parseFloat(document.getElementById(`${sub}_pp2`)?.value) || 0;
-      const pp2Total = parseFloat(document.getElementById(`${sub}_pp2_total`)?.value) || 0;
-      const pp3 = parseFloat(document.getElementById(`${sub}_pp3`)?.value) || 0;
-      const pp3Total = parseFloat(document.getElementById(`${sub}_pp3_total`)?.value) || 0;
-
-      const totalMarks = pp1 + pp2 + pp3;
-      const totalTotal = pp1Total + pp2Total + pp3Total;
-      const percentage = totalTotal > 0 ? (totalMarks / totalTotal) * 100 : 0;
-
-      // Send to backend
-      const response = await fetch('https://school-backend-5bed.onrender.com/saveMarks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentName,
-          exam,
-          subject: sub,
-          marks: totalMarks,
-          total: totalTotal,
-          percentage,
-          className,
-          teacherId: currentTeacherUid,
-          parentEmail: "" // Optional
-        })
-      });
-
-      const data = await response.json();
-      if (!data.success) throw new Error(data.message || "Failed to save marks");
-    }
-
-    msg.style.color = 'green';
-    msg.innerText = "Marks saved successfully!";
-
-  } catch (err) {
-    console.error(err);
-    msg.innerText = "Error: " + err.message;
-  }
+  alert("Marks saved");
 };
 
-// ----------------- SEND RESULTS TO PARENTS -----------------
-window.sendResultsToParents = async () => {
-  const className = document.getElementById('sendClass').value;
-  const exam = document.getElementById('sendExam').value;
-  const msg = document.getElementById('sendMsg');
+// ----------------- LOAD CLASS RESULTS + RANK -----------------
+window.loadClassResults = async ()=>{
+  const cls = classSelect.value;
+  const exam = examSelect.value;
+  const div = classResults;
 
-  msg.style.color = "red";
+  if(!cls||!exam){ div.innerHTML="Select class & exam"; return; }
 
-  if (!className || !exam) {
-    msg.innerText = "Select class and exam";
-    return;
-  }
+  const studentsSnap = await getDocs(query(collection(db,"students"), where("class","==",cls)));
+  const resultsSnap = await getDocs(collection(db,"results"));
 
-  msg.innerText = "Sending results...";
+  let students=[];
 
-  try {
-    const response = await fetch('https://school-backend-5bed.onrender.com/send-results', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ class: className, exam })
+  studentsSnap.forEach(doc=>{
+    const s=doc.data();
+    let total=0,count=0;
+
+    resultsSnap.forEach(rdoc=>{
+      const r=rdoc.data();
+      if(r.name===s.name && r.exam===exam){
+        total+=parseFloat(r.percentage);
+        count++;
+      }
     });
 
-    const data = await response.json();
+    students.push({
+      name:s.name,
+      total:total,
+      mean:count?total/count:0
+    });
+  });
 
-    if (data.success) {
-      msg.style.color = "green";
-      msg.innerText = `Results sent successfully to ${data.sentCount} parents!`;
-    } else {
-      msg.innerText = `No results sent: ${data.message || "Unknown error"}`;
-    }
+  // SORT + RANK
+  students.sort((a,b)=>b.total-a.total);
 
-  } catch (err) {
-    console.error(err);
-    msg.innerText = "Error sending results: " + err.message;
+  let html="<table><tr><th>Pos</th><th>Name</th><th>Total</th><th>Mean</th></tr>";
+
+  students.forEach((s,i)=>{
+    html+=`<tr>
+      <td>${i+1}</td>
+      <td>${s.name}</td>
+      <td>${s.total}</td>
+      <td>${s.mean.toFixed(1)}</td>
+    </tr>`;
+  });
+
+  html+="</table>";
+  div.innerHTML=html;
+};
+
+// ----------------- GALLERY -----------------
+window.loadGallery = async ()=>{
+  const container = galleryContainer;
+  container.innerHTML="Loading...";
+
+  const snap = await getDocs(collection(db,"gallery"));
+  container.innerHTML="";
+
+  snap.forEach(doc=>{
+    const d=doc.data();
+
+    const el = document.createElement("img");
+    el.src=d.url;
+    el.style.width="200px";
+    el.style.cursor="pointer";
+
+    el.onclick=()=>openModal(d.url,"image");
+
+    container.appendChild(el);
+  });
+};
+
+// ----------------- VIDEOS -----------------
+window.loadVideos = async ()=>{
+  const container = videoContainer;
+  container.innerHTML="Loading...";
+
+  const snap = await getDocs(collection(db,"gallery"));
+  container.innerHTML="";
+
+  snap.forEach(doc=>{
+    const d=doc.data();
+    if(d.type!=="video") return;
+
+    const vid=document.createElement("video");
+    vid.src=d.url;
+    vid.width=200;
+    vid.onclick=()=>openModal(d.url,"video");
+
+    container.appendChild(vid);
+  });
+};
+
+// ----------------- FULLSCREEN MODAL -----------------
+window.openModal = (url,type)=>{
+  const modal = mediaModal;
+  const content = modalContent;
+
+  modal.style.display="flex";
+  content.innerHTML="";
+
+  if(type==="image"){
+    content.innerHTML=`<img src="${url}" style="max-width:90%">`;
+  }else{
+    content.innerHTML=`<video src="${url}" controls autoplay style="max-width:90%"></video>`;
   }
+};
+
+closeMediaModal.onclick=()=>{
+  mediaModal.style.display="none";
 };
 
 // ----------------- LOGOUT -----------------
-window.logout = role => {
-  if(role==='student'){ 
-    hideElements([document.getElementById('studentDashboard')]); 
-    showElement(document.getElementById('studentLogin')); 
-  }
-  else { 
-    hideElements([document.getElementById('teacherDashboard')]); 
-    showElement(document.getElementById('teacherLogin')); 
+window.logout = role=>{
+  if(role==="student"){
+    studentDashboard.style.display="none";
+    studentLogin.style.display="block";
+  }else{
+    teacherDashboard.style.display="none";
+    teacherLogin.style.display="block";
   }
 };
 
-// ----------------- PASSWORD RESET -----------------
-document.getElementById('forgotPasswordLink').addEventListener('click', async e=>{
-  e.preventDefault();
-  const email = prompt("Enter your teacher email:");
-  if(!email) return;
-  try{ await sendPasswordResetEmail(auth,email); alert("Password reset link sent!"); }
-  catch(err){ alert("Error: "+err.message); }
+// ----------------- INIT -----------------
+window.addEventListener("DOMContentLoaded",()=>{
+  document.body.style.display="block";
+  show("home");
 });
-
-// ----------------- PASSWORD TOGGLE -----------------
-document.getElementById('toggleTeacherPassword').addEventListener('click',()=>{
-  const input=document.getElementById('teacherPassword');
-  const toggle=document.getElementById('toggleTeacherPassword');
-  if(input.type==='password'){ input.type='text'; toggle.innerText='Hide'; }
-  else { input.type='password'; toggle.innerText='Show'; }
-});
-
-// ----------------- REGISTER TEACHER -----------------
-window.registerTeacher = async () => {
-  const name = document.getElementById('newTeacherName').value.trim();
-  const email = document.getElementById('newTeacherEmail').value.trim();
-  const password = document.getElementById('newTeacherPassword').value.trim();
-  const msg = document.getElementById('addTeacherMsg');
-  msg.style.color='red';
-  if(!name || !email || !password){ msg.innerText="Fill all fields"; return; }
-
-  try{
-    const userCredential = await createUserWithEmailAndPassword(auth,email,password);
-    const uid = userCredential.user.uid;
-    await addDoc(collection(db,'teachers'),{ name,email,uid,timestamp:new Date() });
-    msg.style.color='green';
-    msg.innerText="Teacher registered successfully!";
-    document.getElementById('newTeacherName').value='';
-    document.getElementById('newTeacherEmail').value='';
-    document.getElementById('newTeacherPassword').value='';
-  }catch(e){ msg.innerText="Error: "+e.message; }
-};
-
-// ----------------- LOAD GALLERY -----------------
-window.loadGallery = async () => {
-  const container = document.getElementById('galleryContainer');
-  container.innerHTML = 'Loading gallery...';
-  try {
-    const snap = await getDocs(collection(db, 'gallery'));
-    if (snap.empty) {
-      container.innerHTML = '<p>No images found.</p>';
-      return;
-    }
-    container.innerHTML = ''; // clear old content
-    snap.forEach(doc => {
-      const data = doc.data();
-      const div = document.createElement('div');
-      div.style.textAlign = 'center';
-      div.style.marginBottom = '10px';
-
-      const img = document.createElement('img');
-      img.src = data.url;
-      img.alt = data.caption || "School Image";
-      img.style.width = "200px";
-      img.style.height = "150px";
-      img.style.objectFit = "cover";
-      img.style.border = "2px solid #ccc";
-
-      const caption = document.createElement('p');
-      caption.innerText = data.caption || '';
-
-      div.appendChild(img);
-      div.appendChild(caption);
-      container.appendChild(div);
-    });
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = `<p style="color:red">Error loading gallery: ${err.message}</p>`;
-  }
-};
-
-// ----------------- LOAD VIDEOS -----------------
-window.loadVideos = async () => {
-  const container = document.getElementById('videoContainer');
-  container.innerHTML = 'Loading videos...';
-  try {
-    const snap = await getDocs(collection(db, 'gallery'));
-    if (snap.empty) {
-      container.innerHTML = '<p>No videos found.</p>';
-      return;
-    }
-    container.innerHTML = ''; // clear old content
-    snap.forEach(doc => {
-      const data = doc.data();
-      const div = document.createElement('div');
-      div.style.textAlign = 'center';
-      div.style.marginBottom = '10px';
-      if(data.type !== 'video') return;
-
-      const video = document.createElement('video');
-      video.width = 300;
-      video.controls = true;
-
-      const source = document.createElement('source');
-      source.src = data.url;
-      source.type = 'video/mp4';
-      video.appendChild(source);
-
-      const caption = document.createElement('p');
-      caption.innerText = data.caption || '';
-
-      div.appendChild(video);
-      div.appendChild(caption);
-      container.appendChild(div);
-    });
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = `<p style="color:red">Error loading videos: ${err.message}</p>`;
-  }
-};
-
-// ----------------- INITIAL PAGE LOAD -----------------
-window.addEventListener('DOMContentLoaded',()=>{
-  document.body.style.display='block';
-  showPage('home');
-});
-document.getElementById('fileUpload').addEventListener('change', () => {
-  const file = document.getElementById('fileUpload').files[0];
-  const preview = document.getElementById('previewContainer');
-  preview.innerHTML = "";
-
-  if (!file) return;
-
-  if (file.type.startsWith('image')) {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
-    img.style.width = "150px";
-    img.style.height = "100px";
-    img.style.objectFit = "cover";
-    preview.appendChild(img);
-  } 
-  else if (file.type.startsWith('video')) {
-    const video = document.createElement('video');
-    video.src = URL.createObjectURL(file);
-    video.controls = true;
-    video.style.width = "150px";
-    preview.appendChild(video);
-  }
-});
-
-// ----------------- POPULATE STUDENTS BY CLASS -----------------
-async function populateStudentsByClass() {
-  const classSelect = document.getElementById('marksClassSelect');
-  const studentSelect = document.getElementById('marksStudentSelect');
-
-  // Clear student dropdown
-  studentSelect.innerHTML = '<option value="">Select Student</option>';
-
-  const selectedClass = classSelect.value;
-  if (!selectedClass) return;
-
-  try {
-    const snap = await getDocs(
-      query(collection(db, 'students'), where('class', '==', selectedClass))
-    );
-
-    if (snap.empty) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.innerText = 'No students found';
-      studentSelect.appendChild(opt);
-      return;
-    }
-
-    snap.forEach(doc => {
-      const student = doc.data();
-      const opt = document.createElement('option');
-      opt.value = student.name;
-      opt.innerText = `${student.name} (${student.class})`;
-      studentSelect.appendChild(opt);
-      if(data.type !== 'image') return;
-    });
-
-    // After populating students, generate subject inputs if exam is already selected
-    generateSubjectInputs();
-
-  } catch (err) {
-    console.error(err);
-    alert("Error loading students: " + err.message);
-  }
-}
-document.getElementById('marksClassSelect').addEventListener('change', populateStudentsByClass);
-
-// ------------------ UPLOAD FILE FUNCTION ------------------
-window.uploadFile = () => {
-  const file = document.getElementById('fileUpload').files[0];
-  const title = document.getElementById('fileTitle').value.trim();
-  const msg = document.getElementById('uploadMsg');
-  const progressBar = document.getElementById('uploadProgressBar');
-
-  msg.style.color = "red";
-  msg.innerText = "";
-
-  if (!file || !title) {
-    msg.innerText = "Select file and enter title";
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", "school_uploads");
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", "https://api.cloudinary.com/v1_1/dlzykdayo/auto/upload");
-
-  // ✅ REAL PROGRESS
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const percent = (e.loaded / e.total) * 100;
-      if (progressBar) progressBar.style.width = percent + "%";
-    }
-  };
-
-  xhr.onload = async () => {
-    const data = JSON.parse(xhr.responseText);
-
-    if (data.secure_url) {
-
-      await addDoc(collection(db, 'gallery'), {
-        title,
-        url: data.secure_url,
-        public_id: data.public_id, // 🔥 important
-        type: file.type.startsWith('video') ? 'video' : 'image',
-        uploadedBy: currentTeacherUid,
-        timestamp: new Date()
-      });
-
-      msg.style.color = "green";
-      msg.innerText = "Upload successful!";
-
-      document.getElementById('fileUpload').value = "";
-      document.getElementById('fileTitle').value = "";
-      loadManageUploads();
-
-    } else {
-      msg.innerText = "Upload failed";
-    }
-  };
-
-  xhr.onerror = () => {
-    msg.innerText = "Upload error occurred";
-  };
-
-  xhr.send(formData);
-};
-
-// ------------------ LOAD / MANAGE UPLOADS ------------------
-window.loadManageUploads = async () => {
-  const container = document.getElementById('manageUploads');
-  container.innerHTML = "Loading uploads...";
-
-  try{
-    const snap = await getDocs(collection(db, 'gallery'));
-    if(snap.empty){
-      container.innerHTML = "<p>No uploads yet.</p>";
-      return;
-    }
-
-    container.innerHTML = "";
-    snap.forEach(docSnap => {
-      const data = docSnap.data();
-      const div = document.createElement('div');
-      div.style.border = "1px solid #ccc";
-      div.style.padding = "5px";
-      div.style.margin = "5px";
-      div.style.width = "180px";
-      div.style.display = "inline-block";
-      div.style.textAlign = "center";
-
-      if(data.type === 'image'){
-        const img = document.createElement('img');
-        img.src = data.url;
-        img.style.width = "100%";
-        img.style.height = "100px";
-        img.style.objectFit = "cover";
-        div.appendChild(img);
-      } else if(data.type === 'video'){
-        const video = document.createElement('video');
-        video.src = data.url;
-        video.controls = true;
-        video.style.width = "100%";
-        video.style.height = "100px";
-        div.appendChild(video);
-      }
-
-      const title = document.createElement('p');
-      title.innerText = data.title;
-      div.appendChild(title);
-
-      const delBtn = document.createElement('button');
-      delBtn.innerText = "Delete";
-      delBtn.style.marginTop = "5px";
-      delBtn.onclick = async () => {
-  if(!confirm(`Delete "${data.title}"?`)) return;
-
-  try{
-    // ✅ Delete only from Firestore
-    await deleteDoc(doc(db, 'gallery', docSnap.id));
-
-    // ✅ Reload UI
-    loadManageUploads();
-
-  } catch(err){
-    console.error(err);
-    alert("Error deleting file: " + err.message);
-  }
-};
-      div.appendChild(delBtn);
-
-      container.appendChild(div);
-    });
-
-  } catch(err){
-    console.error(err);
-    container.innerHTML = "<p style='color:red'>Error loading uploads: "+err.message+"</p>";
-  }
-};
-
-// ------------------ AUTO LOAD ON TEACHER DASHBOARD ------------------
-if(document.getElementById('teacherDashboard')){
-  loadManageUploads();
-}
-function previewFile() {
-    const file = document.getElementById("fileUpload").files[0];
-    const caption = document.getElementById("fileTitle").value;
-    const preview = document.getElementById("previewContainer");
-
-    if (!file) {
-        alert("Please select a file first");
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        let content = "";
-        if (file.type.startsWith("image/")) {
-            content = `<img src="${e.target.result}" style="max-width:200px; display:block; margin-top:10px;">`;
-        } else if (file.type.startsWith("video/")) {
-            content = `<video src="${e.target.result}" controls style="max-width:300px; display:block; margin-top:10px;"></video>`;
-        }
-        content += `<p><strong>Caption:</strong> ${caption}</p>`;
-        preview.innerHTML = content;
-    };
-    reader.readAsDataURL(file);
-}
-
-function uploadFile() {
-    const file = document.getElementById("fileUpload").files[0];
-    const caption = document.getElementById("fileTitle").value;
-    const progressBar = document.getElementById("uploadProgressBar");
-    const msg = document.getElementById("uploadMsg");
-    const gallery = document.getElementById("galleryContainer");
-
-    if (!file) {
-        alert("Select a file first");
-        return;
-    }
-
-    let width = 0;
-    const interval = setInterval(() => {
-        if (width >= 100) {
-            clearInterval(interval);
-            msg.textContent = "Upload Complete!";
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                let content = "";
-                if (file.type.startsWith("image/")) {
-                    content = `<div style="text-align:center; margin-bottom:10px;">
-                                   <img src="${e.target.result}" style="max-width:200px; border-radius:5px;">
-                                   <p>${caption}</p>
-                               </div>`;
-                } else if (file.type.startsWith("video/")) {
-                    content = `<div style="text-align:center; margin-bottom:10px;">
-                                   <video src="${e.target.result}" controls style="max-width:250px; border-radius:5px;"></video>
-                                   <p>${caption}</p>
-                               </div>`;
-                }
-                gallery.insertAdjacentHTML("beforeend", content);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            width += 10;
-            progressBar.style.width = width + "%";
-        }
-    }, 200);
-}
