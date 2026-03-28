@@ -1,206 +1,164 @@
-// ----------------- FIREBASE -----------------
+// ----------------- IMPORT FIREBASE -----------------
+import { 
+  getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+
 import { 
-  getFirestore, collection, getDocs, query, where, addDoc 
+  getFirestore, collection, getDocs, query, where, addDoc, deleteDoc, doc, updateDoc 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
 import { 
-  getAuth, signInWithEmailAndPassword 
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-// CONFIG
+// ----------------- FIREBASE CONFIG -----------------
 const firebaseConfig = {
-  apiKey: "AIzaSyDqFbsXJr8G0r_9ppNLYGbsCBGZJdQ4BqA",
+  apiKey: "AIzaSyD...",
   authDomain: "kipini-school-portal.firebaseapp.com",
   projectId: "kipini-school-portal",
   storageBucket: "kipini-school-portal.firebasestorage.app",
-  messagingSenderId: "633954688245",
-  appId: "1:633954688245:web:72ca52641fb9716ab679bc"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
-// ----------------- GLOBALS -----------------
+// ----------------- GLOBAL VARIABLES -----------------
 let currentStudentName = "";
-let currentTeacher = "";
+let currentStudentClass = "";
+let currentTeacherUid = "";
 
-const subjects = ["Math","Eng","Kiswa","CRE","S/S","Sci","Agri"];
+const subjects = ["Math","Eng","Kiswa","CRE","S/S","INT/Sci","PRE-TECH","C.A/P.E","Agri"];
 
-// ----------------- NAV -----------------
-function hideAll(){
-  document.querySelectorAll("section").forEach(s=>s.style.display="none");
+// ----------------- UI HELPERS -----------------
+function hideElements(elements){
+  elements.forEach(el=>{
+    if(el){
+      el.classList.add("hidden");
+      el.style.display="none";
+    }
+  });
 }
-function show(id){
-  hideAll();
-  document.getElementById(id).style.display="block";
+
+function showElement(el){
+  if(!el) return;
+  el.classList.remove("hidden");
+  el.style.display="block";
 }
-window.showPage = id => show(id);
+
+// ----------------- NAVIGATION -----------------
+window.showPage = id=>{
+  ["home","portal","gallerySection","videoSection"].forEach(s=>{
+    const el=document.getElementById(s);
+    if(el) el.style.display="none";
+  });
+  showElement(document.getElementById(id));
+};
 
 window.showLogin = role=>{
-  show("portal");
-  document.getElementById("studentLogin").style.display="none";
-  document.getElementById("teacherLogin").style.display="none";
-  document.getElementById(role+"Login").style.display="block";
+  showPage("portal");
+  hideElements([
+    document.getElementById('studentLogin'),
+    document.getElementById('teacherLogin'),
+    document.getElementById('studentDashboard'),
+    document.getElementById('teacherDashboard')
+  ]);
+  if(role==="student") showElement(document.getElementById("studentLogin"));
+  if(role==="teacher") showElement(document.getElementById("teacherLogin"));
 };
 
 // ----------------- STUDENT LOGIN -----------------
 window.loginStudent = async ()=>{
-  const name = loginName.value.trim().toLowerCase();
-  const year = loginYear.value.trim();
-  const msg = document.getElementById("msg");
+  const name = document.getElementById('loginName').value.trim().toLowerCase();
+  const year = document.getElementById('loginYear').value.trim();
 
-  if(!name || !year){ msg.innerText="Fill all fields"; return; }
+  const snap = await getDocs(collection(db,'students'));
 
-  const snap = await getDocs(collection(db,"students"));
   let found=null;
-
   snap.forEach(doc=>{
     const d=doc.data();
-    if(d.name.toLowerCase()===name && d.year==year) found=d;
+    if(d.name?.toLowerCase()===name && d.year==year){
+      found=d;
+    }
   });
 
   if(found){
     currentStudentName = found.name;
-    msg.style.color="green";
-    msg.innerText="Login success";
+    currentStudentClass = found.class;
 
-    studentLogin.style.display="none";
-    studentDashboard.style.display="block";
-    studentWelcome.innerText="Welcome "+found.name;
+    document.getElementById('studentWelcome').innerText =
+      `Welcome ${found.name} (${found.class})`;
+
+    showElement(document.getElementById('studentDashboard'));
+    hideElements([document.getElementById('studentLogin')]);
+
   }else{
-    msg.innerText="Student not found";
+    alert("Student not found");
   }
 };
 
-// ----------------- STUDENT RESULTS -----------------
-window.loadStudentResults = async ()=>{
-  const exam = studentExamSelect.value;
-  const div = studentResultsDashboard;
+// ----------------- CLASS RESULTS + RANKING -----------------
+window.loadClassResults = async ()=>{
+  const className = document.getElementById('classSelect').value;
+  const exam = document.getElementById('examSelect').value;
+  const div = document.getElementById('classResults');
 
-  if(!exam){ div.innerHTML="Select exam"; return; }
+  if(!className || !exam){
+    div.innerHTML="<p>Select class & exam</p>";
+    return;
+  }
 
-  const q = query(
-    collection(db,"results"),
-    where("name","==",currentStudentName),
-    where("exam","==",exam)
+  const studentsSnap = await getDocs(
+    query(collection(db,'students'), where('class','==',className))
   );
 
-  const snap = await getDocs(q);
-
-  if(snap.empty){ div.innerHTML="No results"; return; }
-
-  let total=0, count=0;
-  let html="<table><tr><th>Subject</th><th>%</th></tr>";
-
-  snap.forEach(doc=>{
-    const r=doc.data();
-    html+=`<tr><td>${r.subject}</td><td>${r.percentage}</td></tr>`;
-    total+=parseFloat(r.percentage); count++;
-  });
-
-  html+=`<tr><td><b>Mean</b></td><td>${(total/count).toFixed(1)}</td></tr></table>`;
-  div.innerHTML=html;
-};
-
-// ----------------- TEACHER LOGIN -----------------
-window.loginTeacher = async ()=>{
-  const email = teacherName.value;
-  const pass = teacherPassword.value;
-  const msg = msgTeacher;
-
-  if(!email||!pass){ msg.innerText="Fill all fields"; return; }
-
-  try{
-    await signInWithEmailAndPassword(auth,email,pass);
-    currentTeacher=email;
-
-    msg.style.color="green";
-    msg.innerText="Login success";
-
-    teacherLogin.style.display="none";
-    teacherDashboard.style.display="block";
-  }catch(e){ msg.innerText=e.message; }
-};
-
-// ----------------- ADD STUDENT -----------------
-window.addStudent = async ()=>{
-  const name=newStudentName.value;
-  const cls=newStudentClass.value;
-  const year=newStudentYear.value;
-  const msg=addStudentMsg;
-
-  if(!name||!cls||!year){ msg.innerText="Fill all"; return; }
-
-  await addDoc(collection(db,"students"),{name,class:cls,year});
-  msg.style.color="green";
-  msg.innerText="Added";
-};
-
-// ----------------- ENTER MARKS -----------------
-window.saveMarks = async ()=>{
-  const student = marksStudentSelect.value;
-  const exam = marksExamSelect.value;
-
-  if(!student||!exam){ alert("Select student & exam"); return; }
-
-  for(let sub of subjects){
-    const val = document.getElementById(sub).value || 0;
-
-    await addDoc(collection(db,"results"),{
-      name:student,
-      exam,
-      subject:sub,
-      percentage:parseFloat(val)
-    });
-  }
-
-  alert("Marks saved");
-};
-
-// ----------------- LOAD CLASS RESULTS + RANK -----------------
-window.loadClassResults = async ()=>{
-  const cls = classSelect.value;
-  const exam = examSelect.value;
-  const div = classResults;
-
-  if(!cls||!exam){ div.innerHTML="Select class & exam"; return; }
-
-  const studentsSnap = await getDocs(query(collection(db,"students"), where("class","==",cls)));
-  const resultsSnap = await getDocs(collection(db,"results"));
+  const resultsSnap = await getDocs(collection(db,'results'));
 
   let students=[];
 
-  studentsSnap.forEach(doc=>{
-    const s=doc.data();
-    let total=0,count=0;
+  studentsSnap.forEach(s=>{
+    let total=0;
+    let count=0;
 
-    resultsSnap.forEach(rdoc=>{
-      const r=rdoc.data();
-      if(r.name===s.name && r.exam===exam){
-        total+=parseFloat(r.percentage);
+    resultsSnap.forEach(r=>{
+      const data=r.data();
+      if(data.name===s.data().name && data.exam===exam){
+        total += Number(data.percentage || data.marks || 0);
         count++;
       }
     });
 
     students.push({
-      name:s.name,
-      total:total,
-      mean:count?total/count:0
+      name:s.data().name,
+      total,
+      mean: count ? Math.round(total/count) : 0
     });
   });
 
-  // SORT + RANK
+  // SORT + POSITION
   students.sort((a,b)=>b.total-a.total);
 
-  let html="<table><tr><th>Pos</th><th>Name</th><th>Total</th><th>Mean</th></tr>";
+  let lastTotal=null;
+  let pos=0;
 
   students.forEach((s,i)=>{
+    if(s.total!==lastTotal) pos=i+1;
+    s.position=pos;
+    lastTotal=s.total;
+  });
+
+  let html=`<table border="1">
+    <tr><th>Pos</th><th>Name</th><th>Total</th><th>Mean</th></tr>`;
+
+  students.forEach(s=>{
     html+=`<tr>
-      <td>${i+1}</td>
+      <td>${s.position}</td>
       <td>${s.name}</td>
       <td>${s.total}</td>
-      <td>${s.mean.toFixed(1)}</td>
+      <td>${s.mean}</td>
     </tr>`;
   });
 
@@ -208,81 +166,111 @@ window.loadClassResults = async ()=>{
   div.innerHTML=html;
 };
 
-// ----------------- GALLERY -----------------
+// ----------------- FULLSCREEN MEDIA -----------------
+window.openMedia = (src,type)=>{
+  const modal=document.getElementById("mediaModal");
+  const content=document.getElementById("modalContent");
+
+  modal.style.display="flex";
+
+  if(type==="video"){
+    content.innerHTML=`<video src="${src}" controls style="max-width:90%"></video>`;
+  }else{
+    content.innerHTML=`<img src="${src}" style="max-width:90%">`;
+  }
+};
+
+window.closeMedia = ()=>{
+  document.getElementById("mediaModal").style.display="none";
+};
+
+// ----------------- LOAD GALLERY -----------------
 window.loadGallery = async ()=>{
-  const container = galleryContainer;
+  const container=document.getElementById('galleryContainer');
   container.innerHTML="Loading...";
 
-  const snap = await getDocs(collection(db,"gallery"));
+  const snap = await getDocs(collection(db,'gallery'));
+
   container.innerHTML="";
 
   snap.forEach(doc=>{
     const d=doc.data();
 
-    const el = document.createElement("img");
-    el.src=d.url;
-    el.style.width="200px";
-    el.style.cursor="pointer";
-
-    el.onclick=()=>openModal(d.url,"image");
-
-    container.appendChild(el);
+    if(d.type==="video"){
+      container.innerHTML += `
+        <video src="${d.url}" width="200"
+        onclick="openMedia('${d.url}','video')"></video>`;
+    }else{
+      container.innerHTML += `
+        <img src="${d.url}" width="200"
+        onclick="openMedia('${d.url}','image')">`;
+    }
   });
 };
 
-// ----------------- VIDEOS -----------------
+// ----------------- LOAD VIDEOS -----------------
 window.loadVideos = async ()=>{
-  const container = videoContainer;
+  const container=document.getElementById('videoContainer');
   container.innerHTML="Loading...";
 
-  const snap = await getDocs(collection(db,"gallery"));
+  const snap = await getDocs(collection(db,'gallery'));
+
   container.innerHTML="";
 
   snap.forEach(doc=>{
     const d=doc.data();
     if(d.type!=="video") return;
 
-    const vid=document.createElement("video");
-    vid.src=d.url;
-    vid.width=200;
-    vid.onclick=()=>openModal(d.url,"video");
-
-    container.appendChild(vid);
+    container.innerHTML += `
+      <video src="${d.url}" width="250" controls></video>
+      <p>${d.caption||""}</p>`;
   });
 };
 
-// ----------------- FULLSCREEN MODAL -----------------
-window.openModal = (url,type)=>{
-  const modal = mediaModal;
-  const content = modalContent;
+// ----------------- SAVE MARKS (FIXED) -----------------
+window.saveMarks = async ()=>{
+  const studentName = document.getElementById('marksStudentSelect').value;
+  const exam = document.getElementById('marksExamSelect').value;
 
-  modal.style.display="flex";
-  content.innerHTML="";
-
-  if(type==="image"){
-    content.innerHTML=`<img src="${url}" style="max-width:90%">`;
-  }else{
-    content.innerHTML=`<video src="${url}" controls autoplay style="max-width:90%"></video>`;
+  if(!studentName || !exam){
+    alert("Select student & exam");
+    return;
   }
-};
 
-closeMediaModal.onclick=()=>{
-  mediaModal.style.display="none";
-};
+  for(let sub of subjects){
 
-// ----------------- LOGOUT -----------------
-window.logout = role=>{
-  if(role==="student"){
-    studentDashboard.style.display="none";
-    studentLogin.style.display="block";
-  }else{
-    teacherDashboard.style.display="none";
-    teacherLogin.style.display="block";
+    const pp1 = Number(document.getElementById(`${sub}_pp1`)?.value || 0);
+    const pp1Total = Number(document.getElementById(`${sub}_pp1_total`)?.value || 0);
+
+    const pp2 = Number(document.getElementById(`${sub}_pp2`)?.value || 0);
+    const pp2Total = Number(document.getElementById(`${sub}_pp2_total`)?.value || 0);
+
+    const pp3 = Number(document.getElementById(`${sub}_pp3`)?.value || 0);
+    const pp3Total = Number(document.getElementById(`${sub}_pp3_total`)?.value || 0);
+
+    const totalMarks = pp1+pp2+pp3;
+    const totalTotal = pp1Total+pp2Total+pp3Total;
+    const percentage = totalTotal ? (totalMarks/totalTotal)*100 : 0;
+
+    await addDoc(collection(db,'results'),{
+      name:studentName,
+      subject:sub,
+      exam,
+      marks:totalMarks,
+      total:totalTotal,
+      percentage,
+      teacherId:currentTeacherUid,
+      timestamp:new Date()
+    });
   }
+
+  alert("Marks saved successfully!");
 };
 
 // ----------------- INIT -----------------
-window.addEventListener("DOMContentLoaded",()=>{
-  document.body.style.display="block";
-  show("home");
+window.addEventListener('DOMContentLoaded',()=>{
+  document.body.style.display='block';
+  showPage('home');
+
+  document.getElementById("closeMediaModal")?.addEventListener("click",window.closeMedia);
 });
