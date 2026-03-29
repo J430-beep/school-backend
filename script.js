@@ -111,7 +111,6 @@ window.loginStudent = async () => {
     msg.innerText="Error: "+e.message; 
   }
 };
-
 // ----------------- LOAD STUDENT RESULTS -----------------
 window.loadStudentResults = async () => {
   const name = currentStudentName;
@@ -134,7 +133,8 @@ window.loadStudentResults = async () => {
     const q = query(
       collection(db, "results"),
       where("name", "==", name),
-      where("exam", "==", exam)
+      where("exam", "==", exam),
+      orderBy("timestamp", "desc")  // Newest first
     );
 
     const snap = await getDocs(q);
@@ -164,21 +164,19 @@ window.loadStudentResults = async () => {
           <td>${r.subject}</td>
           <td>${r.marks}</td>
           <td>${r.total}</td>
-          <td>${r.percentage}</td>
+          <td>${parseFloat(r.percentage).toFixed(2)}</td>
         </tr>
       `;
       totalPercent += parseFloat(r.percentage);
       count++;
     });
 
-   const mean = count > 0 
-  ? (totalPercent / count).toFixed(2) 
-  : "0.00";
+    const mean = count > 0 ? (totalPercent / count).toFixed(2) : "0.00";
 
     html += `
       <tr>
         <td colspan="3"><strong>Mean %</strong></td>
-        <td>${mean.toFixed(2)}</td>
+        <td>${mean}</td>
       </tr>
       </table>
     `;
@@ -214,7 +212,9 @@ window.loadClassResults = async () => {
       return;
     }
 
-    const resultsSnap = await getDocs(collection(db, 'results'));
+    const resultsSnap = await getDocs(
+      query(collection(db, 'results'), orderBy('timestamp', 'desc')) // newest first
+    );
 
     let allStudents = [];
     let subjectTotals = {};
@@ -240,38 +240,34 @@ window.loadClassResults = async () => {
         const r = rDoc.data();
         if (!r.percentage) return;
         if (r.name === student.name && r.exam === exam) {
+          const perc = parseFloat(r.percentage);
           studentData.subjects[r.subject] = {
-            percentage: Math.round(r.percentage),
+            percentage: perc,
             marks: r.marks,
             total: r.total,
             docRef: rDoc.ref
           };
 
-          const perc = parseFloat(r.percentage);
+          if (!isNaN(perc)) {
+            studentData.total += perc;
+            studentData.count++;
 
-if (!isNaN(perc)) {
-  studentData.total += Math.round(perc);
-  studentData.count++;
-
-  subjectTotals[r.subject] += Math.round(perc);
-  subjectCounts[r.subject]++;
-}
-          studentData.count++;
-
-          subjectTotals[r.subject] += Math.round(r.percentage);
-          subjectCounts[r.subject]++;
+            subjectTotals[r.subject] += perc;
+            subjectCounts[r.subject]++;
+          }
         }
       });
 
-      studentData.mean = studentData.count > 0 
-  ? (studentData.total / studentData.count).toFixed(2) 
-  : "0.00";
+      studentData.mean = studentData.count > 0
+        ? (studentData.total / studentData.count).toFixed(2)
+        : "0.00";
+
       allStudents.push(studentData);
     }
 
     // Function to render the table
     const renderTable = () => {
-      // Sort by total descending
+      // Sort students by total descending
       allStudents.sort((a, b) => b.total - a.total);
 
       let html = `<table border="1" cellpadding="5" cellspacing="0">
@@ -293,34 +289,34 @@ if (!isNaN(perc)) {
             <input type="number" 
                    min="0" 
                    max="100" 
-                   value="${val}" 
-                   style="width:50px" 
+                   value="${val.toFixed(2)}" 
+                   style="width:60px" 
                    data-student="${s.name}" 
                    data-subject="${sub}">
           </td>`;
         });
-        html += `<td>${s.total}</td>
+        html += `<td>${s.total.toFixed(2)}</td>
                  <td>${s.mean}</td>
                  <td><button class="updateBtn" data-student="${s.name}">Update</button></td>
         </tr>`;
-        classTotalMean += parseFloat(s.mean) || 0;
+        classTotalMean += parseFloat(s.mean);
       });
 
-      // Subject mean row
+      // Subject mean row (decimals)
       html += `<tr>
         <td colspan="2"><strong>Subject Mean</strong></td>`;
       subjects.forEach(sub => {
-        const mean = (subjectCounts[sub] > 0 && !isNaN(subjectTotals[sub]))
-  ? Math.round(subjectTotals[sub] / subjectCounts[sub])
-  : 0;
+        const mean = (subjectCounts[sub] > 0) 
+          ? (subjectTotals[sub] / subjectCounts[sub]).toFixed(2) 
+          : "0.00";
         html += `<td>${mean}</td>`;
       });
       html += `<td>-</td><td>-</td><td>-</td></tr>`;
 
       // Class mean row
-      const classMean = (allStudents.length > 0 && !isNaN(classTotalMean))
-  ? (classTotalMean / allStudents.length).toFixed(2)
-  : "0.00";
+      const classMean = (allStudents.length > 0)
+        ? (classTotalMean / allStudents.length).toFixed(2)
+        : "0.00";
       html += `<tr>
         <td colspan="${subjects.length + 3}" style="text-align:center">
           <strong>Class Mean: ${classMean}</strong>
@@ -330,7 +326,7 @@ if (!isNaN(perc)) {
       html += `</table>`;
       resultsDiv.innerHTML = html;
 
-      // Add update functionality
+      // Add update functionality (single student)
       document.querySelectorAll('.updateBtn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const studentName = btn.dataset.student;
@@ -342,8 +338,8 @@ if (!isNaN(perc)) {
               const input = row.querySelector(`input[data-subject="${sub}"][data-student="${studentName}"]`);
               if (!input) continue;
 
-              let val = parseInt(input.value);
-              if (isNaN(val) || val < 0) val = 0;
+              let val = parseFloat(input.value) || 0;
+              if (val < 0) val = 0;
               if (val > 100) val = 100;
 
               totalPerc += val;
@@ -357,7 +353,6 @@ if (!isNaN(perc)) {
               if (r) {
                 await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
               } else {
-                // Create new record if none exists
                 await addDoc(collection(db, 'results'), {
                   name: studentName,
                   exam,
@@ -371,86 +366,80 @@ if (!isNaN(perc)) {
               }
             }
 
-            // Update local studentData
             const studentObj = allStudents.find(s => s.name === studentName);
             if (studentObj) {
               studentObj.total = totalPerc;
-              studentObj.mean = count > 0 ? Math.round(totalPerc / count) : 0;
+              studentObj.mean = (count > 0 ? (totalPerc / count) : 0).toFixed(2);
               subjects.forEach(sub => {
-                const val = row.querySelector(`input[data-subject="${sub}"][data-student="${studentName}"]`).value;
-                studentObj.subjects[sub] = { percentage: parseInt(val) };
+                const val = parseFloat(row.querySelector(`input[data-subject="${sub}"][data-student="${studentName}"]`).value) || 0;
+                studentObj.subjects[sub] = { percentage: val };
               });
             }
 
             alert(`Updated ${studentName}'s marks successfully!`);
 
-            // Re-render table after update
-            renderTable();
-
+            renderTable(); // Refresh table
           } catch (err) {
             console.error(err);
             alert('Error updating marks: ' + err.message);
           }
         });
       });
-    };
-document.getElementById('updateAllBtn').addEventListener('click', async () => {
-  try {
-    for (const studentObj of allStudents) {
-      let totalPerc = 0;
-      let count = 0;
 
-      for (let sub of subjects) {
-        const input = document.querySelector(`input[data-student="${studentObj.name}"][data-subject="${sub}"]`);
-        if (!input) continue;
+      // Update all students
+      document.getElementById('updateAllBtn')?.addEventListener('click', async () => {
+        try {
+          for (const studentObj of allStudents) {
+            let totalPerc = 0;
+            let count = 0;
 
-        let val = parseInt(input.value);
-        if (isNaN(val) || val < 0) val = 0;
-        if (val > 100) val = 100;
+            for (let sub of subjects) {
+              const input = document.querySelector(`input[data-student="${studentObj.name}"][data-subject="${sub}"]`);
+              if (!input) continue;
 
-        totalPerc += val;
-        count++;
+              let val = parseFloat(input.value) || 0;
+              if (val < 0) val = 0;
+              if (val > 100) val = 100;
 
-        // Update Firestore
-        const r = resultsSnap.docs.find(d => {
-          const data = d.data();
-          return data.name === studentObj.name && data.exam === exam && data.subject === sub;
-        });
-        if (r) {
-          await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
-        } else {
-          // Create new record if none exists
-          await addDoc(collection(db, 'results'), {
-            name: studentObj.name,
-            exam,
-            subject: sub,
-            marks: val,
-            total: 100,
-            percentage: val,
-            teacherId: currentTeacherUid,
-            timestamp: new Date()
-          });
+              totalPerc += val;
+              count++;
+
+              const r = resultsSnap.docs.find(d => {
+                const data = d.data();
+                return data.name === studentObj.name && data.exam === exam && data.subject === sub;
+              });
+              if (r) {
+                await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
+              } else {
+                await addDoc(collection(db, 'results'), {
+                  name: studentObj.name,
+                  exam,
+                  subject: sub,
+                  marks: val,
+                  total: 100,
+                  percentage: val,
+                  teacherId: currentTeacherUid,
+                  timestamp: new Date()
+                });
+              }
+
+              studentObj.subjects[sub] = { percentage: val };
+            }
+
+            studentObj.total = totalPerc;
+            studentObj.mean = (count > 0 ? (totalPerc / count) : 0).toFixed(2);
+          }
+
+          alert("All students' marks updated successfully!");
+          renderTable();
+        } catch (err) {
+          console.error(err);
+          alert('Error updating all marks: ' + err.message);
         }
+      });
+    };
 
-        // Update local object
-        studentObj.subjects[sub] = { percentage: val };
-      }
-
-      studentObj.total = totalPerc;
-      studentObj.mean = count > 0 ? Math.round(totalPerc / count) : 0;
-    }
-
-    alert("All students' marks updated successfully!");
-    // Re-render table after update
-    renderTable();
-
-  } catch (err) {
-    console.error(err);
-    alert('Error updating all marks: ' + err.message);
-  }
-});
-    // Initial render
-    renderTable();
+    renderTable(); // initial render
 
   } catch (err) {
     console.error(err);
