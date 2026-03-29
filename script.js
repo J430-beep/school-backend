@@ -829,13 +829,12 @@ async function populateStudentsByClass() {
     }
 
     snap.forEach(doc => {
-      const student = doc.data();
-      const opt = document.createElement('option');
-      opt.value = student.name;
-      opt.innerText = `${student.name} (${student.class})`;
-      studentSelect.appendChild(opt);
-      if(data.type !== 'image') return;
-    });
+  const student = doc.data();
+  const opt = document.createElement('option');
+  opt.value = student.name;
+  opt.innerText = `${student.name} (${student.class})`;
+  studentSelect.appendChild(opt);
+});
 
     // After populating students, generate subject inputs if exam is already selected
     generateSubjectInputs();
@@ -1010,77 +1009,7 @@ function previewFile() {
     reader.readAsDataURL(file);
 }
 
-function uploadFile() {
-    const file = document.getElementById("fileUpload").files[0];
-    const caption = document.getElementById("fileTitle").value;
-    const progressBar = document.getElementById("uploadProgressBar");
-    const msg = document.getElementById("uploadMsg");
-    const gallery = document.getElementById("galleryContainer");
 
-    if (!file) {
-        alert("Select a file first");
-        return;
-    }
-
-    let width = 0;
-    const interval = setInterval(() => {
-        if (width >= 100) {
-            clearInterval(interval);
-            msg.textContent = "Upload Complete!";
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                let content = "";
-                if (file.type.startsWith("image/")) {
-                    content = `<div style="text-align:center; margin-bottom:10px;">
-                                   <img src="${e.target.result}" style="max-width:200px; border-radius:5px;">
-                                   <p>${caption}</p>
-                               </div>`;
-                } else if (file.type.startsWith("video/")) {
-                    content = `<div style="text-align:center; margin-bottom:10px;">
-                                   <video src="${e.target.result}" controls style="max-width:250px; border-radius:5px;"></video>
-                                   <p>${caption}</p>
-                               </div>`;
-                }
-                const div = document.createElement("div");
-div.style.textAlign = "center";
-div.style.cursor = "pointer";
-
-if (file.type.startsWith("image/")) {
-    const img = document.createElement("img");
-    img.src = e.target.result;
-    img.style.maxWidth = "200px";
-    img.style.borderRadius = "5px";
-
-    img.onclick = () => openMediaModal(e.target.result, "image", caption);
-
-    div.appendChild(img);
-
-} else if (file.type.startsWith("video/")) {
-    const video = document.createElement("video");
-    video.src = e.target.result;
-    video.style.maxWidth = "200px";
-    video.muted = true;
-
-    video.onclick = () => openMediaModal(e.target.result, "video", caption);
-
-    div.appendChild(video);
-}
-
-const p = document.createElement("p");
-p.textContent = caption;
-
-div.appendChild(p);
-
-gallery.appendChild(div);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            width += 10;
-            progressBar.style.width = width + "%";
-        }
-    }, 200);
-}
 
 // -------------------- OPEN IMAGE OR VIDEO --------------------
 function openMediaModal(src, type, caption) {
