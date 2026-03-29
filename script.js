@@ -409,24 +409,37 @@ window.loadClassResults = async () => {
               totalPerc += val;
               count++;
 
-              const r = resultsSnap.docs.find(d => {
-                const data = d.data();
-                return data.name === studentObj.name && data.exam === exam && data.subject === sub;
-              });
-              if (r) {
-                await updateDoc(r.ref, { percentage: val, timestamp: new Date() });
-              } else {
-                await addDoc(collection(db, 'results'), {
-                  name: studentObj.name,
-                  exam,
-                  subject: sub,
-                  marks: val,
-                  total: 100,
-                  percentage: val,
-                  teacherId: currentTeacherUid,
-                  timestamp: new Date()
-                });
-              }
+              const existingQuery = query(
+  collection(db, "results"),
+  where("name", "==", studentObj.name),
+  where("exam", "==", exam),
+  where("subject", "==", sub)
+);
+
+const existingSnap = await getDocs(existingQuery);
+
+if (!existingSnap.empty) {
+  const docRef = existingSnap.docs[0].ref;
+
+  await updateDoc(docRef, {
+    percentage: val,
+    marks: val,
+    total: 100,
+    timestamp: new Date()
+  });
+
+} else {
+  await addDoc(collection(db, "results"), {
+    name: studentObj.name,
+    exam,
+    subject: sub,
+    marks: val,
+    total: 100,
+    percentage: val,
+    teacherId: currentTeacherUid,
+    timestamp: new Date()
+  });
+}
 
               studentObj.subjects[sub] = { percentage: val };
             }
