@@ -169,7 +169,7 @@ window.loadStudentResults = async () => {
           <td>${r.subject}</td>
           <td>${r.marks}</td>
           <td>${r.total}</td>
-          <td>${parseFloat(r.percentage).toFixed(2)}</td>
+          <td>${Math.round(parseFloat(r.percentage))}</td>
         </tr>
       `;
       totalPercent += parseFloat(r.percentage);
@@ -294,14 +294,15 @@ window.loadClassResults = async () => {
             <input type="number" 
                    min="0" 
                    max="100" 
-                   value="${val.toFixed(2)}" 
+                   value="${Math.round(val)}"
                    style="width:60px" 
                    data-student="${s.name}" 
                    data-subject="${sub}">
           </td>`;
         });
-        html += `<td>${s.total.toFixed(2)}</td>
-                 <td>${s.mean}</td>
+        html += `<td>${Math.round(s.total)}</td>
+                 <td>${Math.round(parseFloat(s.mean))}</td>`;
+    
                  <td><button class="updateBtn" data-student="${s.name}">Update</button></td>
         </tr>`;
         classTotalMean += parseFloat(s.mean);
@@ -312,16 +313,16 @@ window.loadClassResults = async () => {
         <td colspan="2"><strong>Subject Mean</strong></td>`;
       subjects.forEach(sub => {
         const mean = (subjectCounts[sub] > 0) 
-          ? (subjectTotals[sub] / subjectCounts[sub]).toFixed(2) 
-          : "0.00";
+  ? Math.round(subjectTotals[sub] / subjectCounts[sub]) 
+  : 0;
         html += `<td>${mean}</td>`;
       });
       html += `<td>-</td><td>-</td><td>-</td></tr>`;
 
       // Class mean row
-      const classMean = (allStudents.length > 0)
-        ? (classTotalMean / allStudents.length).toFixed(2)
-        : "0.00";
+    const classMean = (allStudents.length > 0)
+  ? Math.round(classTotalMean / allStudents.length)
+  : 0;
       html += `<tr>
         <td colspan="${subjects.length + 3}" style="text-align:center">
           <strong>Class Mean: ${classMean}</strong>
@@ -374,7 +375,7 @@ window.loadClassResults = async () => {
             const studentObj = allStudents.find(s => s.name === studentName);
             if (studentObj) {
               studentObj.total = totalPerc;
-              studentObj.mean = (count > 0 ? (totalPerc / count) : 0).toFixed(2);
+              studentObj.mean = (count > 0 ? Math.round(totalPerc / count) : 0);
               subjects.forEach(sub => {
                 const val = parseFloat(row.querySelector(`input[data-subject="${sub}"][data-student="${studentName}"]`).value) || 0;
                 studentObj.subjects[sub] = { percentage: val };
@@ -445,7 +446,7 @@ if (!existingSnap.empty) {
             }
 
             studentObj.total = totalPerc;
-            studentObj.mean = (count > 0 ? (totalPerc / count) : 0).toFixed(2);
+            studentObj.mean = (count > 0 ? Math.round(totalPerc / count) : 0);
           }
 
           alert("All students' marks updated successfully!");
@@ -578,7 +579,7 @@ window.saveMarks = async () => {
 
       const totalMarks = pp1 + pp2 + pp3;
       const totalTotal = pp1Total + pp2Total + pp3Total;
-      const percentage = totalTotal > 0 ? (totalMarks / totalTotal) * 100 : 0;
+      const percentage = totalTotal > 0 ? Math.round((totalMarks / totalTotal) * 100) : 0;
 
       // Send to backend
       const response = await fetch('https://school-backend-5bed.onrender.com/saveMarks', {
