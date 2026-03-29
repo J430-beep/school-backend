@@ -6,23 +6,28 @@ import {
   getDownloadURL,
   deleteObject 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+
 import { 
   getFirestore, 
   collection, 
   getDocs, 
   query, 
   where, 
+  orderBy,       // <-- ADD THIS
   addDoc,
   deleteDoc,
-  doc
+  doc,
+  updateDoc     // <-- COMBINE updateDoc here
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
 import { 
-  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { updateDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-
-
 // ----------------- FIREBASE CONFIG -----------------
 const firebaseConfig = {
   apiKey: "AIzaSyDqFbsXJr8G0r_9ppNLYGbsCBGZJdQ4BqA",
