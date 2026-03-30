@@ -469,27 +469,58 @@ window.addStudent = async () => {
 };
 
 // ----------------- GENERATE SUBJECT INPUTS -----------------
-function generateSubjectInputs(){
+async function generateSubjectInputs(){
   const student = document.getElementById('marksStudentSelect').value;
   const exam = document.getElementById('marksExamSelect').value;
   const container = document.getElementById('subjectsInputs');
+
   container.innerHTML=''; 
   if(!student || !exam) return;
 
-  subjects.forEach(sub=>{
-    const div = document.createElement('div');
-    div.style.marginBottom='5px';
-    div.innerHTML = `
-      <label style="width:100px; display:inline-block;">${sub}:</label>
-      PP1: <input type="number" id="${sub}_pp1" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp1_total" placeholder="Total" min="1" style="width:50px; margin-right:10px;">
-      PP2: <input type="number" id="${sub}_pp2" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp2_total" placeholder="Total" min="1" style="width:50px; margin-right:10px;">
-      PP3: <input type="number" id="${sub}_pp3" placeholder="Marks" min="0" style="width:50px;">
-      <input type="number" id="${sub}_pp3_total" placeholder="Total" min="1" style="width:50px;">
-    `;
-    container.appendChild(div);
-  });
+  try {
+    // 🔥 GET SAVED DATA
+    const snap = await getDocs(
+      query(
+        collection(db, 'results'),
+        where('name', '==', student),
+        where('exam', '==', exam)
+      )
+    );
+
+    let saved = {};
+
+    snap.forEach(doc => {
+      const data = doc.data();
+      saved[data.subject] = data;
+    });
+
+    // 🔥 CREATE INPUTS WITH SAVED VALUES
+    subjects.forEach(sub=>{
+      const d = saved[sub] || {};
+
+      const div = document.createElement('div');
+      div.style.marginBottom='5px';
+
+      div.innerHTML = `
+        <label style="width:100px; display:inline-block;">${sub}:</label>
+
+        PP1: <input type="number" id="${sub}_pp1" value="${d.pp1 || ''}" style="width:50px;">
+        <input type="number" id="${sub}_pp1_total" value="${d.pp1Total || ''}" style="width:50px; margin-right:10px;">
+
+        PP2: <input type="number" id="${sub}_pp2" value="${d.pp2 || ''}" style="width:50px;">
+        <input type="number" id="${sub}_pp2_total" value="${d.pp2Total || ''}" style="width:50px; margin-right:10px;">
+
+        PP3: <input type="number" id="${sub}_pp3" value="${d.pp3 || ''}" style="width:50px;">
+        <input type="number" id="${sub}_pp3_total" value="${d.pp3Total || ''}" style="width:50px;">
+      `;
+
+      container.appendChild(div);
+    });
+
+  } catch(err){
+    console.error(err);
+    alert("Error loading marks: " + err.message);
+  }
 }
 
 // ----------------- SAVE / UPDATE MARKS (PP1+PP2+PP3) -----------------
@@ -525,14 +556,23 @@ window.saveMarks = async () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentName,
-          exam,
-          subject: sub,
-          marks: totalMarks,
-          total: totalTotal,
-          percentage,
-          className,
-          teacherId: currentTeacherUid,
+  studentName,
+  exam,
+  subject: sub,
+
+  // 🔥 ADD THESE (VERY IMPORTANT)
+  pp1,
+  pp1Total,
+  pp2,
+  pp2Total,
+  pp3,
+  pp3Total,
+
+  marks: totalMarks,
+  total: totalTotal,
+  percentage,
+  className,
+  teacherId: currentTeacherUid,
           parentEmail: "" // Optional
         })
       });
