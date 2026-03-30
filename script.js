@@ -967,9 +967,7 @@ window.loadManageUploads = async () => {
 };
 
 // ------------------ AUTO LOAD ON TEACHER DASHBOARD ------------------
-if(document.getElementById('teacherDashboard')){
-  loadManageUploads();
-}
+
 window.previewFile = function() {
     const file = document.getElementById("fileUpload").files[0];
     const caption = document.getElementById("fileTitle").value;
@@ -1078,6 +1076,9 @@ window.addEventListener('DOMContentLoaded', () => {
         toggle.innerText='Show';
       }
     });
+  }
+  if(document.getElementById('teacherDashboard')){
+  loadManageUploads();
   }
 
   // Class Select
