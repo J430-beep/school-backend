@@ -183,8 +183,33 @@ window.loadStudentResults = async () => {
       </table>
     `;
 
-    resultsDiv.innerHTML = html;
+    resultsDiv.innerHTML = `
+<div id="studentSlip" style="background:white; padding:20px; font-family:Arial;">
 
+  <div style="display:flex; align-items:center;">
+    <img src="logo.png" style="width:70px; margin-right:10px;">
+    <div>
+      <h2>Nakurto Lukuny Comprehensive School</h2>
+      <h3>${exam} Results</h3>
+    </div>
+  </div>
+
+  <hr>
+
+  <p><strong>Name:</strong> ${name}</p>
+  <p><strong>Class:</strong> ${currentStudentClass}</p>
+
+  ${html}
+
+  <h3 style="text-align:right;">Mean: ${mean}</h3>
+
+</div>
+
+<div style="margin-top:10px;">
+  <button onclick="printStudent()">🖨️ Print</button>
+  <button onclick="downloadStudent()">⬇️ Download PDF</button>
+</div>
+`;
   } catch (error) {
     console.error(error);
     resultsDiv.innerHTML = `<p style="color:red">Error: ${error.message}</p>`;
@@ -349,7 +374,28 @@ window.loadClassResults = async () => {
       </tr>`;
 
       html += `</table>`;
-      resultsDiv.innerHTML = html;
+      resultsDiv.innerHTML = `
+<div id="classSheet" style="background:white; padding:20px;">
+
+  <div style="display:flex; align-items:center;">
+    <img src="logo.png" style="width:70px; margin-right:10px;">
+    <div>
+      <h2>Nakurto Lukuny Comprehensive School</h2>
+      <h3>${exam} - ${className}</h3>
+    </div>
+  </div>
+
+  <hr>
+
+  ${html}
+
+</div>
+
+<div style="margin-top:10px;">
+  <button onclick="printClass()">🖨️ Print Class</button>
+  <button onclick="downloadClass()">⬇️ Download PDF</button>
+</div>
+`;
 
       attachInputListeners(); // Attach auto-save
     };
@@ -1113,3 +1159,45 @@ function enableFullscreenMedia() {
     });
   });
 }
+window.printStudent = () => {
+  const content = document.getElementById("studentSlip").innerHTML;
+
+  const win = window.open('', '', 'width=900,height=700');
+  win.document.write(`
+    <html>
+      <head><title>Result Slip</title></head>
+      <body>${content}</body>
+    </html>
+  `);
+
+  win.document.close();
+  win.print();
+};
+window.downloadStudent = () => {
+  const element = document.getElementById("studentSlip");
+
+  html2pdf().from(element).save(currentStudentName + "-result.pdf");
+};
+
+// ----------------- PRINT CLASS RESULTS -----------------
+window.printClass = () => {
+  const content = document.getElementById("classSheet").innerHTML;
+
+  const win = window.open('', '', 'width=1000,height=800');
+  win.document.write(`
+    <html>
+      <head><title>Class Results</title></head>
+      <body>${content}</body>
+    </html>
+  `);
+
+  win.document.close();
+  win.print();
+};
+
+// ----------------- DOWNLOAD CLASS PDF -----------------
+window.downloadClass = () => {
+  const element = document.getElementById("classSheet");
+
+  html2pdf().from(element).save("class-results.pdf");
+};
