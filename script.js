@@ -660,22 +660,7 @@ window.logout = role => {
   }
 };
 
-// ----------------- PASSWORD RESET -----------------
 
-  e.preventDefault();
-  const email = prompt("Enter your teacher email:");
-  if(!email) return;
-  try{ await sendPasswordResetEmail(auth,email); alert("Password reset link sent!"); }
-  catch(err){ alert("Error: "+err.message); }
-});
-
-// ----------------- PASSWORD TOGGLE -----------------
-
-  const input=document.getElementById('teacherPassword');
-  const toggle=document.getElementById('toggleTeacherPassword');
-  if(input.type==='password'){ input.type='text'; toggle.innerText='Hide'; }
-  else { input.type='password'; toggle.innerText='Show'; }
-});
 
 // ----------------- REGISTER TEACHER -----------------
 window.registerTeacher = async () => {
