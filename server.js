@@ -42,7 +42,25 @@ const transporter = nodemailer.createTransport({
 // ================= SAVE MARKS =================
 app.post("/saveMarks", async (req, res) => {
   try {
-    const { studentName, exam, subject, marks, total, teacherId, className, parentEmail } = req.body;
+    const { 
+  studentName, 
+  exam, 
+  subject, 
+
+  // 🔥 ADD THESE
+  pp1,
+  pp1Total,
+  pp2,
+  pp2Total,
+  pp3,
+  pp3Total,
+
+  marks, 
+  total, 
+  teacherId, 
+  className, 
+  parentEmail 
+} = req.body;
     if (!studentName || !exam || !subject) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
@@ -58,11 +76,43 @@ app.post("/saveMarks", async (req, res) => {
 
     if (!querySnap.empty) {
       for (const doc of querySnap.docs) {
-        await doc.ref.update({ marks, total, percentage, teacherId, class: className, timestamp: new Date() });
+          await doc.ref.update({ 
+  marks, 
+  total, 
+  percentage,
+
+  pp1,
+  pp1Total,
+  pp2,
+  pp2Total,
+  pp3,
+  pp3Total,
+
+  teacherId, 
+  class: className, 
+  timestamp: new Date() 
+});   
       }
     } else {
-      await db.collection("results").add({ name: studentName, exam, subject, marks, total, percentage, teacherId, class: className, timestamp: new Date() });
-    }
+      await db.collection("results").add({ 
+  name: studentName,
+  exam,
+  subject,
+
+  pp1,
+  pp1Total,
+  pp2,
+  pp2Total,
+  pp3,
+  pp3Total,
+
+  marks,
+  total,
+  percentage,
+  teacherId,
+  class: className,
+  timestamp: new Date()
+});    }
 
     if (parentEmail) {
       await transporter.sendMail({
