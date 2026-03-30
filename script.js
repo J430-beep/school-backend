@@ -530,7 +530,7 @@ window.addStudent = async () => {
 };
 
 // ----------------- GENERATE SUBJECT INPUTS -----------------
-function generateSubjectInputs(){
+window.generateSubjectInputs = function(){
   const student = document.getElementById('marksStudentSelect').value;
   const exam = document.getElementById('marksExamSelect').value;
   const container = document.getElementById('subjectsInputs');
@@ -661,7 +661,7 @@ window.logout = role => {
 };
 
 // ----------------- PASSWORD RESET -----------------
-document.getElementById('forgotPasswordLink').addEventListener('click', async e=>{
+
   e.preventDefault();
   const email = prompt("Enter your teacher email:");
   if(!email) return;
@@ -670,7 +670,7 @@ document.getElementById('forgotPasswordLink').addEventListener('click', async e=
 });
 
 // ----------------- PASSWORD TOGGLE -----------------
-document.getElementById('toggleTeacherPassword').addEventListener('click',()=>{
+
   const input=document.getElementById('teacherPassword');
   const toggle=document.getElementById('toggleTeacherPassword');
   if(input.type==='password'){ input.type='text'; toggle.innerText='Hide'; }
@@ -805,7 +805,7 @@ document.getElementById('fileUpload').addEventListener('change', () => {
 });
 
 // ----------------- POPULATE STUDENTS BY CLASS -----------------
-async function populateStudentsByClass() {
+window.populateStudentsByClass = async function() {
   const classSelect = document.getElementById('marksClassSelect');
   const studentSelect = document.getElementById('marksStudentSelect');
 
@@ -844,7 +844,7 @@ async function populateStudentsByClass() {
     alert("Error loading students: " + err.message);
   }
 }
-document.getElementById('marksClassSelect').addEventListener('change', populateStudentsByClass);
+
 
 // ------------------ UPLOAD FILE FUNCTION ------------------
 window.uploadFile = () => {
@@ -985,7 +985,7 @@ window.loadManageUploads = async () => {
 if(document.getElementById('teacherDashboard')){
   loadManageUploads();
 }
-function previewFile() {
+window.previewFile = function() {
     const file = document.getElementById("fileUpload").files[0];
     const caption = document.getElementById("fileTitle").value;
     const preview = document.getElementById("previewContainer");
@@ -1060,3 +1060,45 @@ function enableFullscreenMedia() {
     });
   });
 }
+
+// ✅ FIX ALL EVENT LISTENERS
+window.addEventListener('DOMContentLoaded', () => {
+
+  // Forgot Password
+  const forgot = document.getElementById('forgotPasswordLink');
+  if (forgot) {
+    forgot.addEventListener('click', async e=>{
+      e.preventDefault();
+      const email = prompt("Enter your teacher email:");
+      if(!email) return;
+      try {
+        await sendPasswordResetEmail(auth,email);
+        alert("Password reset link sent!");
+      } catch(err){
+        alert("Error: "+err.message);
+      }
+    });
+  }
+
+  // Toggle Password
+  const toggle = document.getElementById('toggleTeacherPassword');
+  if (toggle) {
+    toggle.addEventListener('click', ()=>{
+      const input = document.getElementById('teacherPassword');
+      if(input.type==='password'){
+        input.type='text';
+        toggle.innerText='Hide';
+      } else {
+        input.type='password';
+        toggle.innerText='Show';
+      }
+    });
+  }
+
+  // Class Select
+  const classSelect = document.getElementById('marksClassSelect');
+  if (classSelect) {
+    classSelect.addEventListener('change', populateStudentsByClass);
+  }
+
+});
