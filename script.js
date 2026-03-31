@@ -1169,19 +1169,28 @@ window.printStudent = () => {
 window.downloadStudent = () => {
   const element = document.getElementById("studentSlip");
 
-  html2pdf().from(element).outputPdf('blob').then((pdfBlob) => {
-    const reader = new FileReader();
+  const opt = {
+    margin: 5,
+    filename: currentStudentName + "-result.pdf",
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: {
+      scale: 2,           // higher scale = better resolution
+      scrollY: 0,         // capture full content, not just viewport
+      useCORS: true
+    },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
 
+  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+    const reader = new FileReader();
     reader.onloadend = function () {
       const base64data = reader.result.split(',')[1];
-
       if (window.Android) {
         Android.saveBase64Pdf(base64data, currentStudentName + "-result.pdf");
       } else {
         alert("Download only works inside app");
       }
     };
-
     reader.readAsDataURL(pdfBlob);
   });
 };
@@ -1197,17 +1206,22 @@ window.printClass = () => {
 window.downloadClass = () => {
   const element = document.getElementById("classSheet");
 
-  html2pdf().from(element).outputPdf('blob').then((pdfBlob) => {
-    const reader = new FileReader();
+  const opt = {
+    margin: 5,
+    filename: "class-results.pdf",
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: { scale: 2, scrollY: 0, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // landscape for wide tables
+  };
 
+  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+    const reader = new FileReader();
     reader.onloadend = function () {
       const base64data = reader.result.split(',')[1];
-
       if (window.Android) {
         Android.saveBase64Pdf(base64data, "class-results.pdf");
       }
     };
-
     reader.readAsDataURL(pdfBlob);
   });
 };
