@@ -9,6 +9,14 @@ input, select, textarea {
   box-sizing: border-box;    /* ensures padding doesn't break width */
   width: 100%;               /* make them full-width unless overridden */
 }
+/* 🔥 FIX TABLE INPUTS ONLY */
+#classResults input {
+  width: 60px !important;
+  height: 28px;
+  padding: 4px;
+  text-align: center;
+  font-size: 13px;
+}
 
 /* ===== GLOBAL BUTTONS ===== */
 button {
@@ -226,11 +234,14 @@ nav {
 }
 
 #studentResultsDashboard td,
-#classResults td {
-  border: 1px solid #000; /* simple black border */
-  padding: 10px;
+#classResults td,
+#studentResultsDashboard th,
+#classResults th {
+  border: 1px solid #000;
+  padding: 8px;
   text-align: center;
   color: #000;
+  white-space: nowrap; /* 🔥 VERY IMPORTANT */
 }
 
 #studentResultsDashboard tr:nth-child(even),
@@ -328,4 +339,17 @@ nav {
   background: #fff; /* remove all alternate/hover colors */
   transform: none;
   font-weight: normal;
+}
+@media print {
+  body {
+    zoom: 0.8; /* shrink to fit page */
+  }
+
+  .table-responsive {
+    overflow: visible !important; /* remove scroll for PDF */
+  }
+
+  table {
+    min-width: 100% !important;
+  }
 }
