@@ -213,6 +213,7 @@ nav {
   background: #fff;
   border-radius: 0;
   box-shadow: none;
+  table-layout: auto; /* 🔥 ADD THIS LINE */
 }
 
 #studentResultsDashboard th,
@@ -306,14 +307,11 @@ nav {
 /* ===== RESPONSIVE TABLE ===== */
 .table-responsive {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 0;
-  box-shadow: none;
+  overflow-x: auto; /* allows scrolling on phone */
 }
 
 .table-responsive table {
-  min-width: 600px;
+  min-width: 900px;  /* 🔥 increase width so all columns fit */
   border-collapse: collapse;
 }
 
