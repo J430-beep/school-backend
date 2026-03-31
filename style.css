@@ -353,3 +353,17 @@ nav {
     min-width: 100% !important;
   }
 }
+@media print {
+  body {
+    zoom: 0.8; /* shrink if content is large */
+  }
+  #studentSlip, #classSheet {
+    width: 100%;
+    height: auto;
+    overflow: visible !important; /* important for full capture */
+  }
+  table {
+    min-width: 100% !important;
+    table-layout: auto; /* prevent clipping columns */
+  }
+}
