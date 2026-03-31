@@ -1181,11 +1181,24 @@ window.downloadStudent = () => {
     filename: currentStudentName + "-result.pdf",
     image: { type: 'jpeg', quality: 1 },
     html2canvas: { scale: 2, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  html2pdf().set(opt).from(element).save();
+  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+    const reader = new FileReader();
+
+    reader.onloadend = function () {
+      const base64data = reader.result.split(',')[1];
+
+      if (window.Android) {
+        Android.saveBase64Pdf(base64data, currentStudentName + "-result.pdf");
+      } else {
+        alert("Download only works inside app");
+      }
+    };
+
+    reader.readAsDataURL(pdfBlob);
+  });
 };
 
 // ----------------- PRINT CLASS RESULTS -----------------
@@ -1212,10 +1225,21 @@ window.downloadClass = () => {
     margin: 5,
     filename: "class-results.pdf",
     image: { type: 'jpeg', quality: 1 },
-    html2canvas: { scale: 2, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, // 🔥 important
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
   };
 
-  html2pdf().set(opt).from(element).save();
+  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+    const reader = new FileReader();
+
+    reader.onloadend = function () {
+      const base64data = reader.result.split(',')[1];
+
+      if (window.Android) {
+        Android.saveBase64Pdf(base64data, "class-results.pdf");
+      }
+    };
+
+    reader.readAsDataURL(pdfBlob);
+  });
 };
