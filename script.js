@@ -178,7 +178,7 @@ window.loadStudentResults = async () => {
     html += `
       <tr>
         <td colspan="3"><strong>Mean %</strong></td>
-        <td>${mean.toFixed(2)}</td>
+        <td>${mean}</td>
       </tr>
       </table>
     `;
