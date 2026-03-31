@@ -1176,7 +1176,16 @@ window.printStudent = () => {
 window.downloadStudent = () => {
   const element = document.getElementById("studentSlip");
 
-  html2pdf().from(element).save(currentStudentName + "-result.pdf");
+  const opt = {
+    margin: 5,
+    filename: currentStudentName + "-result.pdf",
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: { scale: 2, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(element).save();
 };
 
 // ----------------- PRINT CLASS RESULTS -----------------
@@ -1199,5 +1208,14 @@ window.printClass = () => {
 window.downloadClass = () => {
   const element = document.getElementById("classSheet");
 
-  html2pdf().from(element).save("class-results.pdf");
+  const opt = {
+    margin: 5,
+    filename: "class-results.pdf",
+    image: { type: 'jpeg', quality: 1 },
+    html2canvas: { scale: 2, scrollX: 0, scrollY: 0 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, // 🔥 important
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(element).save();
 };
