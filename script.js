@@ -1160,31 +1160,16 @@ function enableFullscreenMedia() {
   });
 }
 window.printStudent = () => {
-  const content = document.getElementById("studentSlip").innerHTML;
-
-  const win = window.open('', '', 'width=900,height=700');
-  win.document.write(`
-    <html>
-      <head><title>Result Slip</title></head>
-      <body>${content}</body>
-    </html>
-  `);
-
-  win.document.close();
-  win.print();
+  if (window.Android) {
+    Android.printStudent(); // call Android
+  } else {
+    alert("Print only works inside app");
+  }
 };
 window.downloadStudent = () => {
   const element = document.getElementById("studentSlip");
 
-  const opt = {
-    margin: 5,
-    filename: currentStudentName + "-result.pdf",
-    image: { type: 'jpeg', quality: 1 },
-    html2canvas: { scale: 2, scrollY: 0 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-
-  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+  html2pdf().from(element).outputPdf('blob').then((pdfBlob) => {
     const reader = new FileReader();
 
     reader.onloadend = function () {
@@ -1203,33 +1188,16 @@ window.downloadStudent = () => {
 
 // ----------------- PRINT CLASS RESULTS -----------------
 window.printClass = () => {
-  const content = document.getElementById("classSheet").innerHTML;
-
-  const win = window.open('', '', 'width=1000,height=800');
-  win.document.write(`
-    <html>
-      <head><title>Class Results</title></head>
-      <body>${content}</body>
-    </html>
-  `);
-
-  win.document.close();
-  win.print();
+  if (window.Android) {
+    Android.printStudent(); // reuse same print method
+  }
 };
 
 // ----------------- DOWNLOAD CLASS PDF -----------------
 window.downloadClass = () => {
   const element = document.getElementById("classSheet");
 
-  const opt = {
-    margin: 5,
-    filename: "class-results.pdf",
-    image: { type: 'jpeg', quality: 1 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  };
-
-  html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+  html2pdf().from(element).outputPdf('blob').then((pdfBlob) => {
     const reader = new FileReader();
 
     reader.onloadend = function () {
