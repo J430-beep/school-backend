@@ -367,3 +367,22 @@ nav {
     table-layout: auto; /* prevent clipping columns */
   }
 }
+@media print {
+  body * {
+    display: none !important;
+  }
+
+  #studentSlip, #studentSlip * {
+    display: block !important;
+  }
+
+  #classSheet, #classSheet * {
+    display: block !important;
+  }
+}
+@media print {
+  #studentSlip, #classSheet {
+    width: 100%;
+    margin: 0 auto;
+  }
+}
